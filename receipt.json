@@ -1,0 +1,22 @@
+{
+  "receiptType": "FiscalInvoice",
+  "currency": "USD",
+  "invoiceNo": "INV-0001",
+  "linesTaxInclusive": true,
+  "lines": [
+    {
+      "name": "Bread",
+      "price": 2.5,
+      "quantity": 2,
+      "taxId": 1,
+      "taxPercent": 15,
+      "taxCode": "A"
+    }
+  ],
+  "payments": [
+    {
+      "moneyType": "Cash",
+      "amount": 5
+    }
+  ]
+}

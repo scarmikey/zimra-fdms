@@ -19,6 +19,10 @@ const { values } = parseArgs({
     ca: { type: "string", short: "c", default: "zimra-simulator-ca.pem" },
     "activation-key": { type: "string", multiple: true },
     "close-delay": { type: "string", default: "300" },
+    "initial-fiscal-day": { type: "string", default: "0" },
+    "initial-global-no": { type: "string", default: "0" },
+    "initial-receipt-counter": { type: "string", default: "0" },
+    "initial-previous-receipt-hash": { type: "string", default: "" },
     san: { type: "string", multiple: true },
     help: { type: "boolean", short: "h" },
   },
@@ -33,6 +37,10 @@ Options
   --ca <file>             Where to write the CA certificate (default zimra-simulator-ca.pem)
   --activation-key <key>  Accept only these keys for RegisterDevice (repeatable; default any 8 chars)
   --close-delay <ms>      Time before CloseDay settles (default 300)
+  --initial-fiscal-day <n> Start simulator with this fiscal day already open
+  --initial-global-no <n>  Seed the historical receipt global number
+  --initial-receipt-counter <n> Seed the previous receipt counter
+  --initial-previous-receipt-hash <hash> Seed the previous receipt hash
   --san <name-or-ip>      Extra subject alternative name for the server certificate
                           (repeatable; --host 0.0.0.0 --san 10.0.2.2 for an Android emulator)
 
@@ -47,6 +55,10 @@ const sim = await FdmsSimulator.create({
   host: values.host,
   activationKeys: values["activation-key"],
   closeDelayMs: Number(values["close-delay"]),
+  initialFiscalDayNo: Number(values["initial-fiscal-day"]),
+  initialGlobalNo: Number(values["initial-global-no"]),
+  initialReceiptCounter: Number(values["initial-receipt-counter"]),
+  initialPreviousReceiptHash: values["initial-previous-receipt-hash"],
   hosts: values.san,
 });
 const { url, caPem } = await sim.start();

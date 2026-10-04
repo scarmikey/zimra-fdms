@@ -43,6 +43,10 @@ export interface SimulatorOptions {
   taxPayerName?: string;
   taxPayerTIN?: string;
   qrUrl?: string;
+  initialFiscalDayNo?: number;
+  initialGlobalNo?: number;
+  initialReceiptCounter?: number;
+  initialPreviousReceiptHash?: string;
 }
 
 /** Faults are consumed as they fire, so a test sets exactly what it wants. */
@@ -117,6 +121,10 @@ export class FdmsSimulator {
       taxPayerName: "Simulated Taxpayer",
       taxPayerTIN: "2000000000",
       qrUrl: "https://fdmstest.zimra.co.zw",
+      initialFiscalDayNo: 0,
+      initialGlobalNo: 0,
+      initialReceiptCounter: 0,
+      initialPreviousReceiptHash: "",
       ...options,
     };
   }
@@ -160,12 +168,23 @@ export class FdmsSimulator {
 
   /** Register a device without going through RegisterDevice (test setup). */
   addDevice(deviceId: number, serialNumber: string): SimDevice {
+    const initialFiscalDayNo = this.options.initialFiscalDayNo ?? 0;
+
+    const days: SimDay[] = initialFiscalDayNo > 0
+      ? [{
+          fiscalDayNo: initialFiscalDayNo,
+          opened: fdmsDateTime(new Date()),
+          receipts: [],
+          counters: [],
+        }]
+      : [];
+
     const d: SimDevice = {
       deviceId,
       serialNumber,
       commonName: `ZIMRA-${serialNumber}-${String(deviceId).padStart(10, "0")}`,
-      status: "FiscalDayClosed",
-      days: [],
+      status: initialFiscalDayNo > 0 ? "FiscalDayOpened" : "FiscalDayClosed",
+      days,
       nextReceiptId: 1,
     };
     this.devices.set(deviceId, d);
@@ -350,8 +369,11 @@ export class FdmsSimulator {
       fiscalDayDocumentQuantities: day
         ? summarise(day.receipts.map((r) => r.receipt))
         : [],
-      lastReceiptGlobalNo: latest?.receipt.receiptGlobalNo ?? 0,
-      lastFiscalDayNo: day?.fiscalDayNo ?? 0,
+      lastReceiptGlobalNo: Math.max(
+        this.options.initialGlobalNo ?? 0,
+        latest?.receipt.receiptGlobalNo ?? 0,
+      ),
+      lastFiscalDayNo: day?.fiscalDayNo ?? this.options.initialFiscalDayNo ?? 0,
       fiscalDayClosingErrorCode: device.closingErrorCode ?? null,
     };
   }
@@ -387,17 +409,27 @@ export class FdmsSimulator {
       errors.push({ validationErrorCode: code, validationErrorColor: colour, validationErrorDescription: text });
 
     // Sequencing.
-    const expectedCounter = day.receipts.length + 1;
+    const expectedCounter =
+      (this.options.initialReceiptCounter ?? 0) +
+      day.receipts.length +
+      1;
     if (r.receiptCounter !== expectedCounter) {
       err("RCPT011", RED, `Receipt counter is not sequential (expected ${expectedCounter})`);
     }
-    const highest = Math.max(0, ...device.days.flatMap((d) => d.receipts.map((x) => x.receipt.receiptGlobalNo)));
+    const highest = Math.max(
+      this.options.initialGlobalNo ?? 0,
+      ...device.days.flatMap((d) => d.receipts.map((x) => x.receipt.receiptGlobalNo)),
+    );
     if (r.receiptGlobalNo !== highest + 1) {
       err("RCPT012", RED, "Receipt global number is not sequential");
     }
 
     // Dates.
     const prev = day.receipts[day.receipts.length - 1];
+    const previousReceiptHash =
+      prev?.receipt.receiptDeviceSignature.hash ??
+      (this.options.initialPreviousReceiptHash || undefined);
+
     if (prev && r.receiptDate <= prev.receipt.receiptDate) {
       err("RCPT030", RED, "Receipt date is earlier than the previous receipt date");
     }
@@ -410,7 +442,7 @@ export class FdmsSimulator {
     }
 
     // Signature over the canonical string the SDK must reproduce exactly.
-    const canonical = receiptSigningString(device.deviceId, r, prev?.receipt.receiptDeviceSignature.hash);
+    const canonical = receiptSigningString(device.deviceId, r, previousReceiptHash);
     const hash = sha256Base64(canonical);
     let verified = false;
     if (r.receiptDeviceSignature?.hash === hash) {
@@ -519,7 +551,7 @@ export class FdmsSimulator {
       }
     }, this.options.closeDelayMs).unref();
 
-    return { operationID };
+    return { operationID, fiscalDayNo: day.fiscalDayNo };
   }
 }
 

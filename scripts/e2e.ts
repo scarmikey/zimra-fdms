@@ -4,6 +4,7 @@
  */
 import { readFileSync } from "node:fs";
 import { FiscalDevice } from "../src/index.js";
+import { cents } from "../src/core/money.js";
 
 const device = {
   deviceId: 37367,
@@ -87,7 +88,7 @@ const r2 = await fd.submitReceipt({
   lines: [
     {
       name: "Training workshop",
-      price: 57.5,
+      price: cents("57.50"),
       quantity: 2,
       taxId: standard.taxID,
       taxPercent: standard.taxPercent,

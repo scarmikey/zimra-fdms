@@ -34,7 +34,16 @@ const identity = {
   privateKeyPem: readFileSync("secrets/device-private-key.pem", "utf-8"),
 };
 
-const http = new FdmsClient(device, new NodeTransport(identity), { environment: "test" });
+const http = new FdmsClient(
+  device,
+  new NodeTransport(identity, {
+    ca: readFileSync("zimra-simulator-ca.pem", "utf-8"),
+  }),
+  {
+    environment: "test",
+    baseUrl: process.env.ZIMRA_BASE_URL || undefined,
+  },
+);
 
 const status = await http.request<GetStatusResponse>(
   "GET",
