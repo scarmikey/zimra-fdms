@@ -166,10 +166,10 @@ you.
 ### 4. Surviving a crash
 
 Give the device a `Storage` and it persists day state and a pending-submit
-marker before every FDMS call. On startup, `reconcile()` loads the state and
-settles a submit the process died in the middle of: it asks FDMS whether
-the receipt arrived, resubmits the identical signed receipt if not, and
-never issues a duplicate or skips a number.
+marker before every FDMS call. On startup, `reconcile()` loads the state
+and checks GetStatus. If the status confirms the receipt, the SDK commits
+it locally. If the reported global number is lower, the outcome remains
+unknown: the pending marker is retained and the SDK does not resubmit.
 
 ```ts
 import { FiscalDevice } from "zimra-fdms";
@@ -196,10 +196,11 @@ queue.oldestPendingAgeMs;                  // warn before the 72 hours run out
 
 Receipts are numbered, hash-chained and signed at sale time and appended
 to a journal; `flush()` submits them in order and moves a commit cursor.
-Appending is O(1), the file is never rewritten, and a crash between append
-and commit leaves either a receipt to resubmit (which `reconcile()` settles)
-or nothing, never a gap. Implement `Journal` (`append`, `readFrom`,
-`commit`, `committed`) for SQLite or a database; a 0.3.x `QueueStorage` is
+Appending is O(1), and the file is never rewritten. If a crash or network
+failure leaves a receipt's outcome uncertain, `flush()` pauses until
+reconciliation can confirm it; it does not blindly resubmit. Implement
+`Journal` (`append`, `readFrom`, `commit`, `committed`) for SQLite or a
+database; a 0.3.x `QueueStorage` is
 still accepted and wrapped.
 
 ### 6. Certificate renewal

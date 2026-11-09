@@ -56,7 +56,19 @@ function fakeFdms() {
           }
           const g = body.receipt.receiptGlobalNo as number;
           if (g !== lastGlobal + 1) {
-            return reply({ receiptID: g, validationErrors: [{ validationErrorCode: "RCPT012", validationErrorColor: "Red" }], operationID: "op" });
+            accepted.push(g);
+            lastGlobal = g;
+
+            return reply({
+              receiptID: g,
+              validationErrors: [
+                {
+                  validationErrorCode: "RCPT012",
+                  validationErrorColor: "Red",
+                },
+              ],
+              operationID: "op",
+            });
           }
           accepted.push(g);
           lastGlobal = g;
@@ -168,7 +180,7 @@ describe("pending-submit marker", () => {
 describe("reconcile after a crash", () => {
   const scenarios: { name: string; killAt: string; expectAction: string }[] = [
     { name: "before the marker is written", killAt: "set:pending-submit", expectAction: "none" },
-    { name: "after the marker, before the request", killAt: "request", expectAction: "resubmitted" },
+    { name: "after the marker, before the request", killAt: "request", expectAction: "unknown" },
     { name: "after FDMS accepted, before state commit", killAt: "set:day-state", expectAction: "confirmed" },
     { name: "after state commit, before marker delete", killAt: "delete:pending-submit", expectAction: "confirmed" },
   ];
@@ -200,12 +212,21 @@ describe("reconcile after a crash", () => {
       const result = await fd2.reconcile();
       assert.equal(result.action, sc.expectAction, JSON.stringify(result));
 
-      const { receipt } = await fd2.submitReceipt({ ...SALE, invoiceNo: "after" });
-      const expectedNext = sc.expectAction === "none" ? 12 : 13;
-      assert.equal(receipt.receiptGlobalNo, expectedNext);
-      assert.deepEqual(fdms.accepted, sc.expectAction === "none" ? [11, 12] : [11, 12, 13]);
-      assert.equal(new Set(fdms.accepted).size, fdms.accepted.length, "no duplicates");
-      assert.equal(fd2.getState()!.previousReceiptHash, receipt.receiptDeviceSignature.hash);
+      if (sc.expectAction === "unknown") {
+        assert.equal((await fd2.pendingReceipt())!.receipt.receiptGlobalNo, 12);
+        await assert.rejects(
+          fd2.submitReceipt({ ...SALE, invoiceNo: "after" }),
+          PendingSubmitError
+        );
+        assert.deepEqual(fdms.accepted, [11], "must not resubmit an unresolved receipt");
+      } else {
+        const { receipt } = await fd2.submitReceipt({ ...SALE, invoiceNo: "after" });
+        const expectedNext = sc.expectAction === "none" ? 12 : 13;
+        assert.equal(receipt.receiptGlobalNo, expectedNext);
+        assert.deepEqual(fdms.accepted, sc.expectAction === "none" ? [11, 12] : [11, 12, 13]);
+        assert.equal(new Set(fdms.accepted).size, fdms.accepted.length, "no duplicates");
+        assert.equal(fd2.getState()!.previousReceiptHash, receipt.receiptDeviceSignature.hash);
+      }
     });
   }
 
@@ -259,7 +280,7 @@ describe("offline queue with a journal", () => {
     },
   };
 
-  it("signs at sale time and flushes in order", async () => {
+  it("journals sales in FIFO order and pauses flush when the outcome is unknown", async () => {
     const storage = new MemoryStorage();
     const fdms = fakeFdms();
     const { signer } = await generatePemSigner();
@@ -273,21 +294,23 @@ describe("offline queue with a journal", () => {
     const q = new OfflineReceiptQueue(fd, new MemoryJournal());
 
     const a = await q.submitOrEnqueue({ ...SALE, invoiceNo: "a" });
-    const b = await q.submitOrEnqueue({ ...SALE, invoiceNo: "b" });
     assert.equal(a, undefined);
+    assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
+    const b = await q.submitOrEnqueue({ ...SALE, invoiceNo: "b" });
     assert.equal(b, undefined);
     assert.equal(q.size, 2);
     assert.ok(q.oldestPendingAgeMs! >= 0);
-    // Chain fixed at sale time: state already advanced past both.
     assert.equal(fd.getState()!.receiptGlobalNo, 12);
-    // The flush attempt for "a" left its marker; the next flush settles it.
     assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
 
     online = true;
     const res = await q.flush();
-    assert.equal(res.remaining, 0);
-    assert.deepEqual(res.submitted.map((s) => s.receipt.receiptGlobalNo), [11, 12]);
-    assert.deepEqual(fdms.accepted, [11, 12]);
+    assert.equal(res.remaining, 2);
+    assert.equal(res.submitted.length, 0);
+    assert.ok(res.error instanceof PendingSubmitError);
+    assert.equal(q.size, 2);
+    assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
+    assert.deepEqual(fdms.accepted, [], "must not submit while the earlier outcome is unresolved");
     assert.equal(fd.getState()!.receiptGlobalNo, 12);
   });
 
@@ -344,6 +367,34 @@ describe("offline queue with a journal", () => {
     assert.equal(second.remaining, 0);
     assert.deepEqual(fdms.accepted, [11]);
     assert.equal(await fd.pendingReceipt(), undefined);
+  });
+
+  it("does not resubmit a journal entry confirmed during startup reconciliation", async () => {
+    const storage = new MemoryStorage();
+    const fdms = fakeFdms();
+    const journal = new MemoryJournal();
+    const fd1 = await device(storage, fdms.transport);
+    await fd1.openDay();
+
+    const q1 = new OfflineReceiptQueue(fd1, journal);
+    await q1.enqueue(SALE);
+    fdms.faults.dropAfterSubmit = true;
+
+    const first = await q1.flush();
+    assert.ok(first.error instanceof TransportError);
+    assert.deepEqual(fdms.accepted, [11]);
+
+    const fd2 = await device(storage, fdms.transport);
+    const reconciled = await fd2.reconcile();
+    assert.equal(reconciled.action, "confirmed");
+    assert.equal(await fd2.pendingReceipt(), undefined);
+    assert.equal(await fd2.isReceiptConfirmed(11), true);
+
+    const q2 = new OfflineReceiptQueue(fd2, journal);
+    const recovered = await q2.flush();
+    assert.equal(recovered.remaining, 0);
+    assert.equal(recovered.submitted.length, 1);
+    assert.deepEqual(fdms.accepted, [11], "confirmed receipt must not be submitted twice");
   });
 
   it("wraps a 0.3.x QueueStorage and signs its unsigned receipts at flush", async () => {

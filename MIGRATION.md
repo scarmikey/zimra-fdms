@@ -104,7 +104,7 @@ Everything public is exported from `zimra-fdms`; prefer that over deep paths.
   clock still produces Green receipts.
 - `FdmsApiError.explain()` and `.supportCode`.
 - Idempotent calls (GET endpoints, Ping) retry twice with jitter on network
-  failure. SubmitReceipt is never retried; a lost answer goes through
-  `reconcile()`.
+  failure. SubmitReceipt is never automatically retried. If GetStatus cannot
+  confirm acceptance, the marker remains and the outcome is unknown.
 - `ZIMRA_BASE_URL` and `ZIMRA_CA` point the CLI, MCP server and e2e script at
   `npx zimra-fdms-simulator`.

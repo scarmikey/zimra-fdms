@@ -6,6 +6,7 @@
  * moment a receipt is signed.
  */
 import type { FiscalDevice, PreparedReceipt, ReceiptInput, SubmittedReceipt } from "./device.js";
+import { PendingSubmitError } from "./device.js";
 import { MemoryJournal, type Journal } from "./journal.js";
 import { isNetworkError } from "./transport.js";
 
@@ -137,9 +138,8 @@ export class OfflineReceiptQueue {
       return await this.device.submitPrepared(prepared);
     } catch (err) {
       if (isNetworkError(err)) {
-        // The device wrote a pending marker for this receipt; the journal
-        // owns it from here, so the marker is dropped.
-        await this.device.discardPending();
+        // Keep the pending marker: FDMS may have accepted the receipt
+        // even though its response was lost. The journal also retains it.
         await this.take(prepared);
         return undefined;
       }
@@ -170,12 +170,24 @@ export class OfflineReceiptQueue {
 
   private async submitOne(item: PreparedReceipt | ReceiptInput): Promise<SubmittedReceipt> {
     if (!isPrepared(item)) return this.device.submitReceipt(item);
+
+    // Startup reconciliation may have confirmed and removed the marker
+    // before the queue is opened. Never submit an already-confirmed receipt.
+    if (await this.device.isReceiptConfirmed(item.receipt.receiptGlobalNo)) {
+      return {
+        receipt: item.receipt,
+        response: {} as SubmittedReceipt["response"],
+        qrData: this.device.qrData(item),
+      };
+    }
+
     // A previous flush may have died after writing the marker for this very
     // receipt; reconcile() settles it without a duplicate submit.
     const marker = await this.device.pendingReceipt();
     if (marker && marker.receipt.receiptGlobalNo === item.receipt.receiptGlobalNo) {
       const r = await this.device.reconcile();
       if (r.action === "rejected") throw r.error;
+      if (r.action === "unknown") throw new PendingSubmitError(r.receiptGlobalNo);
       const response = r.action === "resubmitted" ? r.response : ({} as SubmittedReceipt["response"]);
       return { receipt: item.receipt, response, qrData: this.device.qrData(item) };
     }

@@ -1,3 +1,7 @@
+import { SimulatorCa } from "../src/simulator/ca.js";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { mkdtemp, mkdir, rm, copyFile, readFile } from "node:fs/promises";
 /**
  * The SDK against the simulator over real mutual TLS: registration from a
  * CSR, the full day cycle, every validation code the simulator replays,
@@ -280,5 +284,119 @@ describe("simulator", () => {
       await fd.closeDay();
       await waitForStatus(fd, "FiscalDayClosed");
     });
+
+    it("does not resubmit a stored receipt when GetStatus under-reports its global number", async () => {
+      const { pems, identity } = await freshDevice();
+      const storage = new MemoryStorage();
+      const fd = new FiscalDevice(
+        identity,
+        { signer: new PemSigner(pems.privateKeyPem), transport: new NodeTransport(pems, { ca: caPem }), storage },
+        { baseUrl: url },
+      );
+
+      await fd.openDay();
+
+      const first = await fd.submitReceipt({
+        ...SALE,
+        invoiceNo: "FUTURE-1",
+        receiptDate: new Date(Date.now() + 3600_000),
+      });
+      assert.deepEqual(
+        first.response.validationErrors.map((e) => e.validationErrorCode),
+        ["RCPT031"],
+      );
+
+      sim.faults.dropAfterSubmit = 1;
+      await assert.rejects(
+        fd.submitReceipt({ ...SALE, invoiceNo: "EARLIER-2", receiptDate: new Date() }),
+        TransportError,
+      );
+
+      const pendingBefore = await fd.pendingReceipt();
+      assert.equal(pendingBefore?.receipt.receiptGlobalNo, 2);
+
+      const result = await fd.reconcile();
+
+      assert.equal(result.action, "unknown");
+      assert.equal((await fd.pendingReceipt())?.receipt.receiptGlobalNo, 2);
+      assert.equal(fd.getState()!.receiptGlobalNo, 1);
+
+      const serverDevice = sim.devices.get(identity.deviceId)!;
+      const storedReceipts = serverDevice.days.flatMap((day) => day.receipts);
+      assert.equal(storedReceipts.length, 2);
+      assert.deepEqual(
+        storedReceipts.map((entry) => entry.receipt.receiptGlobalNo),
+        [1, 2],
+      );
+    });
+  });
+});
+
+
+describe("persistent simulator CA", () => {
+  it("creates and reloads the same CA certificate", async () => {
+    const root = await mkdtemp(join(tmpdir(), "zimra-ca-"));
+    try {
+      const certPath = join(root, "ca.pem");
+      const keyPath = join(root, "ca-key.pem");
+
+      const created = await SimulatorCa.loadOrCreate(certPath, keyPath, "Test CA");
+      const originalCert = await readFile(certPath, "utf8");
+      const loaded = await SimulatorCa.loadOrCreate(certPath, keyPath, "Different Name");
+      const reloadedCert = await readFile(certPath, "utf8");
+
+      assert.equal(reloadedCert, originalCert);
+      assert.equal(loaded.thumbprint, created.thumbprint);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects incomplete certificate and key pairs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "zimra-ca-"));
+    try {
+      const source = join(root, "source");
+      await mkdir(source);
+      const sourceCa = await SimulatorCa.loadOrCreate(
+        join(source, "ca.pem"),
+        join(source, "ca-key.pem"),
+        "Source CA"
+      );
+
+      const certPath = join(root, "incomplete.pem");
+      await copyFile(join(source, "ca.pem"), certPath);
+
+      await assert.rejects(
+        SimulatorCa.loadOrCreate(certPath, join(root, "missing-key.pem"), "Incomplete CA"),
+        /both.*exist|incomplete/i
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a certificate paired with a different private key", async () => {
+    const root = await mkdtemp(join(tmpdir(), "zimra-ca-"));
+    try {
+      const first = join(root, "first");
+      const second = join(root, "second");
+      const mismatch = join(root, "mismatch");
+      await Promise.all([mkdir(first), mkdir(second), mkdir(mismatch)]);
+
+      await SimulatorCa.loadOrCreate(join(first, "ca.pem"), join(first, "key.pem"), "First CA");
+      await SimulatorCa.loadOrCreate(join(second, "ca.pem"), join(second, "key.pem"), "Second CA");
+
+      const certPath = join(mismatch, "ca.pem");
+      const keyPath = join(mismatch, "key.pem");
+      await copyFile(join(first, "ca.pem"), certPath);
+      await copyFile(join(second, "key.pem"), keyPath);
+
+      await assert.rejects(
+        SimulatorCa.loadOrCreate(certPath, keyPath, "Mismatched CA"),
+        /does not match|mismatch|match/i
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

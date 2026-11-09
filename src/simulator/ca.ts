@@ -6,6 +6,9 @@
  */
 import * as x509 from "@peculiar/x509";
 import { webcrypto } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 x509.cryptoProvider.set(webcrypto as Crypto);
 
@@ -44,6 +47,71 @@ export class SimulatorCa {
       ],
     });
     return new SimulatorCa(keys, cert);
+  }
+
+
+  /**
+   * Load a persistent simulator CA or create it on first startup.
+   * Refuse to replace incomplete or mismatched credentials.
+   */
+  static async loadOrCreate(
+    certificatePath: string,
+    privateKeyPath: string,
+    name = "zimra-fdms simulator CA",
+  ): Promise<SimulatorCa> {
+    const certExists = existsSync(certificatePath);
+    const keyExists = existsSync(privateKeyPath);
+
+    if (certExists !== keyExists) {
+      throw new Error("Simulator CA is incomplete. Refusing to replace it.");
+    }
+
+    if (certExists && keyExists) {
+      const certificate = new x509.X509Certificate(
+        await readFile(certificatePath, "utf8"),
+      );
+      const privateKeyPem = await readFile(privateKeyPath, "utf8");
+
+      const privateKey = await webcrypto.subtle.importKey(
+        "pkcs8",
+        x509.PemConverter.decodeFirst(privateKeyPem),
+        ALG,
+        true,
+        ["sign"],
+      );
+
+      const publicKey = await certificate.publicKey.export(ALG, ["verify"]);
+      const challenge = webcrypto.getRandomValues(new Uint8Array(32));
+      const signature = await webcrypto.subtle.sign(ALG, privateKey, challenge);
+
+      if (!(await webcrypto.subtle.verify(ALG, publicKey, signature, challenge))) {
+        throw new Error("Simulator CA private key does not match its certificate.");
+      }
+
+      return new SimulatorCa({ privateKey, publicKey }, certificate);
+    }
+
+    const ca = await SimulatorCa.create(name);
+    await mkdir(dirname(certificatePath), { recursive: true });
+    await mkdir(dirname(privateKeyPath), { recursive: true });
+
+    const privateKeyPem = x509.PemConverter.encode(
+      await webcrypto.subtle.exportKey("pkcs8", ca.keys.privateKey),
+      "PRIVATE KEY",
+    );
+
+    await writeFile(privateKeyPath, privateKeyPem, {
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
+    });
+
+    await writeFile(certificatePath, ca.caPem, {
+      encoding: "utf8",
+      flag: "wx",
+    });
+
+    return ca;
   }
 
   get caPem(): string {

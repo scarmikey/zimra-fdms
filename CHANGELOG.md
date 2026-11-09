@@ -49,8 +49,9 @@ fiscal behaviour changes, and 0.3.x code keeps working.
   through JSON with up to two places; the CLI and MCP server apply it.
 - **Crash safety.** With a `Storage`, `FiscalDevice` writes a
   pending-submit marker before every SubmitReceipt and `reconcile()` settles
-  it on the next start: confirms with GetStatus, resubmits the identical
-  signed receipt, or reports a rejection. `submitReceipt()`, `openDay()`
+  it on the next start when GetStatus confirms acceptance. If the outcome
+  is uncertain, reconciliation retains the marker and does not blindly
+  resubmit. `submitReceipt()`, `openDay()`
   and `closeDay()` throw `PendingSubmitError` while a marker exists. The
   highest global number ever issued is kept in storage and `openDay()`
   takes the largest of server, stored and given values. `FileStorage` on
@@ -63,7 +64,8 @@ fiscal behaviour changes, and 0.3.x code keeps working.
   `MemoryJournal` in core, `journalFromQueueStorage()` wraps a 0.3.x
   `QueueStorage` and upgrades its unsigned entries on load.
   `oldestPendingAgeMs` for the 72-hour window. A flush that died after
-  writing the marker is settled through `reconcile()`, not sent twice.
+  writing the marker is resolved through `reconcile()`. An unknown
+  outcome pauses the queue.
 - **`zimra-fdms/simulator`** and `npx zimra-fdms-simulator`: a local FDMS
   with a generated CA and real mutual TLS. Issues certificates from the
   SDK's CSR, verifies every signature with the shared canonical-string

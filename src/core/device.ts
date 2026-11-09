@@ -64,6 +64,8 @@ export interface FiscalDayState {
   fiscalDayDate: string;
   receiptCounter: number;
   receiptGlobalNo: number;
+  /** Highest receipt global number confirmed as accepted by FDMS. */
+  confirmedReceiptGlobalNo?: number;
   previousReceiptHash?: string;
   /** fdmsDateTime of the last submitted receipt — FDMS requires strictly increasing receiptDates (RCPT030). */
   previousReceiptDate?: string;
@@ -129,9 +131,11 @@ export type ReconcileResult =
   | { action: "none" }
   /** FDMS already had the receipt; local state caught up. */
   | { action: "confirmed"; receiptGlobalNo: number }
-  /** FDMS did not have it; the same signed receipt was sent again and accepted. */
+  /** FDMS status cannot establish whether the pending receipt was accepted. */
+  | { action: "unknown"; receiptGlobalNo: number }
+  /** Retained for compatibility with callers handling older reconciliation results. */
   | { action: "resubmitted"; receiptGlobalNo: number; response: SubmitReceiptResponse }
-  /** FDMS refused the resubmit. Counters were not advanced; the receipt is dropped. */
+  /** Retained for compatibility with callers handling older reconciliation results. */
   | { action: "rejected"; receiptGlobalNo: number; error: FdmsApiError };
 
 export interface SubmittedReceipt {
@@ -211,8 +215,19 @@ export class FiscalDevice {
     return this.state ? cloneState(this.state) : undefined;
   }
 
+  /** Check durable FDMS confirmation, loading persisted state when necessary. */
+  async isReceiptConfirmed(receiptGlobalNo: number): Promise<boolean> {
+    await this.loadPersistedState();
+    return (this.state?.confirmedReceiptGlobalNo ?? 0) >= receiptGlobalNo;
+  }
+
   restoreState(state: FiscalDayState): void {
+    const confirmed = this.state?.confirmedReceiptGlobalNo ?? 0;
     this.state = cloneState(state);
+    this.state.confirmedReceiptGlobalNo = Math.max(
+      this.state.confirmedReceiptGlobalNo ?? 0,
+      confirmed,
+    );
   }
 
   /** Highest receipt global number this device has issued, from storage. */
@@ -260,17 +275,18 @@ export class FiscalDevice {
   }
 
   /**
-   * Bring a restarted device back to a known state. Loads persisted day
-   * state, then settles any pending submit by asking FDMS whether it
-   * arrived and resubmitting the identical signed receipt if not. Call it
-   * on startup before the first receipt; submitReceipt() and closeDay()
-   * refuse to run while a submit is pending.
+   * Restore persisted day state and resolve any pending receipt submission
+   * using FDMS status. A pending receipt is committed locally only when
+   * GetStatus.lastReceiptGlobalNo is at least its global number.
    *
-   * Confirmation uses GetStatus.lastReceiptGlobalNo, which is the number of
-   * the receipt with the latest date rather than the highest issued, so
-   * after a future-dated receipt (RCPT031) it can under-report and the
-   * resubmit path is taken instead; FDMS then answers with a Red RCPT012
-   * for the duplicate number.
+   * A lower status number does not prove that FDMS rejected or never received
+   * the receipt. GetStatus reports the receipt with the latest date rather
+   * than the highest global number, so a future-dated receipt (RCPT031) can
+   * cause it to under-report. In that case reconcile() returns "unknown",
+   * retains the pending marker, and does not resubmit.
+   *
+   * Call on startup before submitting another receipt. submitReceipt() and
+   * closeDay() refuse to run while a submit remains pending.
    */
   async reconcile(): Promise<ReconcileResult> {
     await this.loadPersistedState();
@@ -283,21 +299,10 @@ export class FiscalDevice {
       await this.commitPrepared(pending, undefined);
       return { action: "confirmed", receiptGlobalNo };
     }
-    try {
-      const response = await this.http.request<SubmitReceiptResponse>(
-        "POST",
-        this.http.devicePath("SubmitReceipt"),
-        { receipt: pending.receipt },
-      );
-      await this.commitPrepared(pending, response);
-      return { action: "resubmitted", receiptGlobalNo, response };
-    } catch (error) {
-      if (error instanceof FdmsApiError) {
-        await this.storage?.delete(KEY_PENDING);
-        return { action: "rejected", receiptGlobalNo, error };
-      }
-      throw error;
-    }
+
+    // A lower status number cannot prove that FDMS did not accept the receipt.
+    // Keep the marker and require an authoritative resolution; never blindly resubmit.
+    return { action: "unknown", receiptGlobalNo };
   }
 
   /**
@@ -399,6 +404,7 @@ export class FiscalDevice {
       fiscalDayDate: fdmsDate(opened),
       receiptCounter: 0,
       receiptGlobalNo: lastGlobal,
+      confirmedReceiptGlobalNo: status.lastReceiptGlobalNo ?? 0,
       previousReceiptHash: undefined,
       counters: [],
     };
@@ -631,6 +637,10 @@ export class FiscalDevice {
     if (!this.state || this.state.receiptGlobalNo < prepared.receipt.receiptGlobalNo) {
       this.state = cloneState(prepared.stateAfter);
     }
+    this.state.confirmedReceiptGlobalNo = Math.max(
+      this.state.confirmedReceiptGlobalNo ?? 0,
+      prepared.receipt.receiptGlobalNo,
+    );
     for (const v of response?.validationErrors ?? []) {
       if (v.validationErrorColor?.toLowerCase() === "red") {
         (this.state.redErrors ??= []).push({

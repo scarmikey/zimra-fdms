@@ -129,8 +129,11 @@ export class FdmsSimulator {
     };
   }
 
-  static async create(options: SimulatorOptions = {}): Promise<FdmsSimulator> {
-    return new FdmsSimulator(await SimulatorCa.create(), options);
+  static async create(
+    options: SimulatorOptions = {},
+    ca?: SimulatorCa,
+  ): Promise<FdmsSimulator> {
+    return new FdmsSimulator(ca ?? await SimulatorCa.create(), options);
   }
 
   /** Start listening. Returns the base URL to point the SDK at. */
