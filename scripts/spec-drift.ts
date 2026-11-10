@@ -103,8 +103,12 @@ function surface(spec: any): Surface {
   return out;
 }
 
-/** True if this contract key is something the SDK depends on. */
-function isBreaking(key: string): boolean {
+/** True if this finding changes a contract the SDK depends on. */
+function isBreaking({ kind, key, was, now }: Finding): boolean {
+  // Optional params come and go between test and prod (RegisterDevice's
+  // CacheKey, Oct 2026). Adding, dropping or loosening one changes nothing for
+  // a caller that doesn't send it. Only a param that is required breaks us.
+  if (key.startsWith("param:") && (kind === "removed" ? was : now) === "required=false") return false;
   // Enum *values* changing under a type we mirror as a closed union breaks us.
   if (key.startsWith("enum:")) return SDK_ENUMS.includes(key.slice("enum:".length));
   // Bare schema presence is name-churn; what matters is props/enums, tracked above.
@@ -132,7 +136,7 @@ function diff(baseline: Surface, live: Surface): Finding[] {
   const findings: Finding[] = [];
   for (const [key, now] of live) {
     const was = baseline.get(key);
-    if (was === undefined) findings.push({ kind: "added", key });
+    if (was === undefined) findings.push({ kind: "added", key, now });
     else if (was !== now) findings.push({ kind: "changed", key, was, now });
   }
   for (const [key, was] of baseline) {
@@ -178,8 +182,8 @@ async function main() {
       }
 
       const findings = diff(baseline, live);
-      const breaking = findings.filter((f) => isBreaking(f.key));
-      const info = findings.filter((f) => !isBreaking(f.key));
+      const breaking = findings.filter(isBreaking);
+      const info = findings.filter((f) => !isBreaking(f));
       breakingTotal += breaking.length;
       infoTotal += info.length;
 

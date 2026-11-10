@@ -39,6 +39,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "CacheKey",
+            "in": "query",
+            "description": "Cache key of the fiscal device version this model name and version resolve to",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -57,6 +65,30 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterDeviceResponse"
+                },
+                "example": {
+                  "operationID": "0HMPH9AF0QKKE:00000005",
+                  "certificate": "-----BEGIN CERTIFICATE-----\nMIIC6TCCAdGgAwIBAgIFAKsSzWowDQYJKoZIhvcNAQELBQAwZDELMAkGA1UEBhMC\nTFQxETAPBgNVBAoMCEdvb2QgTHRkMScwJQYDVQQLDB5Hb29kIEx0ZCBDZXJ0aWZp\nY2F0ZSBBdXRob3JpdHkxGTAXBgNVBAMMEEdvb2QgTHRkIFJvb3QgQ0EwHhcNMTkx\nMDAzMTU1NzA1WhcNMjAxMDEyMTU1NzA1WjBfMQswCQYDVQQGEwJUWjERMA8GA1UE\nCAwIWmFuemliYXIxHzAdBgNVBAoMFlphbnppYmFyIFJldmVudWUgQm9hcmQxHDAa\nBgNVBAMME1pSQi1lVkZELTAwMDAwMDAwNDIwWTATBgcqhkjOPQIBBggqhkjOPQMB\nBwNCAAT7v3DvY7pRg4lz2Z87wSMwSX27KwlpYnSRV6WUiPjpq2XsUAbg2lhUN7q3\nmlNJaUzqoKPmop5qURIpqUydXfapo3IwcDAJBgNVHRMEAjAAMB8GA1UdIwQYMBaA\nFK1RXHm1plvaintqlWaXDs1X3LX+MB0GA1UdDgQWBBRqr96XrCUbuwCQawxO0//n\nTOCoNTAOBgNVHQ8BAf8EBAMCBeAwEwYDVR0lBAwwCgYIKwYBBQUHAwIwDQYJKoZI\nhvcNAQELBQADggEBANr1Wk1cVZB96yobFgK3rQQv9oXW+Jle7Jh36J2o4wSSB+RH\nlfMojDrqKVQCLrFDcF+8JIA3RTRKdduIXgBAr13xQ8JkHd1/o23yN6a2DaYgh0wr\nDrndlR6y1yG0vQuurJ3IgXmC0ldM5+VhalgmoCKFV9JsUD+GhOyJ6NWlc0SqvJCs\n3RZLYwZ4MNViPbRy0Kbp0ufY1zTbh02Gw9aVfFzUwL8GS00iMb4MnSav1xur7wQh\nBoF3PpNvu003P7f1eVJ62qVD2LWWntfn0mL1aRmDe2wpMQKAKhxto+sDb2mfJ6G6\nPFtwMHe7BUfiwTzGYqav21h1w/amPkxNVQ7Li4M=\n-----END CERTIFICATE-----"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "headers": {
@@ -127,30 +159,6 @@
                   "title": "Server error",
                   "status": 500,
                   "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Success",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegisterDeviceResponse"
-                },
-                "example": {
-                  "operationID": "0HMPH9AF0QKKE:00000005",
-                  "certificate": "-----BEGIN CERTIFICATE-----\nMIIC6TCCAdGgAwIBAgIFAKsSzWowDQYJKoZIhvcNAQELBQAwZDELMAkGA1UEBhMC\nTFQxETAPBgNVBAoMCEdvb2QgTHRkMScwJQYDVQQLDB5Hb29kIEx0ZCBDZXJ0aWZp\nY2F0ZSBBdXRob3JpdHkxGTAXBgNVBAMMEEdvb2QgTHRkIFJvb3QgQ0EwHhcNMTkx\nMDAzMTU1NzA1WhcNMjAxMDEyMTU1NzA1WjBfMQswCQYDVQQGEwJUWjERMA8GA1UE\nCAwIWmFuemliYXIxHzAdBgNVBAoMFlphbnppYmFyIFJldmVudWUgQm9hcmQxHDAa\nBgNVBAMME1pSQi1lVkZELTAwMDAwMDAwNDIwWTATBgcqhkjOPQIBBggqhkjOPQMB\nBwNCAAT7v3DvY7pRg4lz2Z87wSMwSX27KwlpYnSRV6WUiPjpq2XsUAbg2lhUN7q3\nmlNJaUzqoKPmop5qURIpqUydXfapo3IwcDAJBgNVHRMEAjAAMB8GA1UdIwQYMBaA\nFK1RXHm1plvaintqlWaXDs1X3LX+MB0GA1UdDgQWBBRqr96XrCUbuwCQawxO0//n\nTOCoNTAOBgNVHQ8BAf8EBAMCBeAwEwYDVR0lBAwwCgYIKwYBBQUHAwIwDQYJKoZI\nhvcNAQELBQADggEBANr1Wk1cVZB96yobFgK3rQQv9oXW+Jle7Jh36J2o4wSSB+RH\nlfMojDrqKVQCLrFDcF+8JIA3RTRKdduIXgBAr13xQ8JkHd1/o23yN6a2DaYgh0wr\nDrndlR6y1yG0vQuurJ3IgXmC0ldM5+VhalgmoCKFV9JsUD+GhOyJ6NWlc0SqvJCs\n3RZLYwZ4MNViPbRy0Kbp0ufY1zTbh02Gw9aVfFzUwL8GS00iMb4MnSav1xur7wQh\nBoF3PpNvu003P7f1eVJ62qVD2LWWntfn0mL1aRmDe2wpMQKAKhxto+sDb2mfJ6G6\nPFtwMHe7BUfiwTzGYqav21h1w/amPkxNVQ7Li4M=\n-----END CERTIFICATE-----"
                 }
               }
             }
@@ -178,80 +186,6 @@
           }
         ],
         "responses": {
-          "400": {
-            "description": "Bad Request",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiProblemDetails"
-                },
-                "example": {
-                  "errorCode": "DEV01",
-                  "type": "https://httpstatuses.io/422",
-                  "title": "Unprocessable Entity",
-                  "status": 422,
-                  "detail": "Device not found or not active",
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "Success",
             "headers": {
@@ -280,6 +214,26 @@
               }
             }
           },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Certificate requested by thumbprint not found",
             "headers": {
@@ -301,6 +255,60 @@
                   "type": "https://httpstatuses.io/404",
                   "title": "Not Found",
                   "status": 400,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiProblemDetails"
+                },
+                "example": {
+                  "errorCode": "DEV01",
+                  "type": "https://httpstatuses.io/422",
+                  "title": "Unprocessable Entity",
+                  "status": 422,
+                  "detail": "Device not found or not active",
+                  "operationID": "0HMPDRRQL1C0G:00000005"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
                   "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
@@ -343,6 +351,26 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyTaxpayerInformationResponse"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "headers": {
@@ -413,26 +441,6 @@
                   "title": "Server error",
                   "status": 500,
                   "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Success",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VerifyTaxpayerInformationResponse"
                 }
               }
             }
@@ -508,7 +516,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       },
       "ContactsDto": {
         "type": "object",
@@ -581,7 +589,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       },
       "RegisterDeviceRequest": {
         "required": [
@@ -662,7 +670,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       },
       "VerifyTaxpayerInformationRequest": {
         "required": [

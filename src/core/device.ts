@@ -1,4 +1,4 @@
-import { FdmsClient, type FdmsClientOptions, type Transport } from "./transport.js";
+import { FdmsClient, isOutcomeUnknown, type FdmsClientOptions, type Transport } from "./transport.js";
 import { type Signer, type EcdsaSignatureFormat, signCanonicalString } from "./signer.js";
 import { ServerCorrectedClock, type Clock } from "./clock.js";
 import { buildCsr, deviceCommonName } from "./csr.js";
@@ -6,9 +6,11 @@ import { receiptQrData } from "./qr.js";
 import { amountToCents, centsToAmount, type Money } from "./money.js";
 import type { Storage } from "./storage.js";
 import {
+  compareReceiptTaxes,
   fdmsDate,
   fdmsDateTime,
   fiscalDaySigningString,
+  formatTaxPercent,
   receiptSigningString,
   toCents,
 } from "./signing.js";
@@ -16,6 +18,7 @@ import {
   FdmsApiError,
   type CloseDayRequest,
   type CloseDayResponse,
+  type CreditDebitNote,
   type DeviceIdentity,
   type FiscalDayCounter,
   type GetConfigResponse,
@@ -124,6 +127,22 @@ export class PendingSubmitError extends Error {
       `Receipt global no ${receiptGlobalNo} was submitted but its outcome is unknown. Call reconcile() before issuing another receipt.`,
     );
     this.name = "PendingSubmitError";
+  }
+}
+
+/**
+ * Thrown by signReceipt() and submitReceipt() when a ReceiptInput cannot
+ * make a valid receipt. Raised before anything is numbered, signed or sent,
+ * so the day state is unchanged. `field` is a path into the input, such as
+ * "lines[2].quantity".
+ */
+export class ReceiptValidationError extends Error {
+  constructor(
+    public readonly field: string,
+    public readonly reason: string,
+  ) {
+    super(`${field}: ${reason}`);
+    this.name = "ReceiptValidationError";
   }
 }
 
@@ -425,11 +444,14 @@ export class FiscalDevice {
     if (!opts.force && s.redErrors?.length) {
       throw new DayNotClosableError(s.fiscalDayNo, s.redErrors);
     }
+    // A day persisted by an earlier SDK version can hold "usd" and "USD"
+    // counter sets. Merge them so CloseDay signs and sends one set.
+    const counters = mergeCurrencyCase(s.counters);
     const canonical = fiscalDaySigningString(
       this.device.deviceId,
       s.fiscalDayNo,
       s.fiscalDayDate,
-      s.counters,
+      counters,
     );
     const signature = await signCanonicalString(
       this.signer,
@@ -438,7 +460,7 @@ export class FiscalDevice {
     );
     const body: CloseDayRequest = {
       fiscalDayNo: s.fiscalDayNo,
-      fiscalDayCounters: s.counters.filter(
+      fiscalDayCounters: counters.filter(
         (c) => toCents(c.fiscalCounterValue) !== 0,
       ),
       fiscalDayDeviceSignature: signature,
@@ -471,6 +493,7 @@ export class FiscalDevice {
    */
   async signReceipt(input: ReceiptInput): Promise<PreparedReceipt> {
     const s = this.requireDay();
+    validateReceiptInput(input, s.previousReceiptDate);
     const receiptType = input.receiptType ?? "FiscalInvoice";
     const inclusive = input.linesTaxInclusive ?? true;
     let date = input.receiptDate ?? this.clock.now();
@@ -513,14 +536,17 @@ export class FiscalDevice {
       0,
     );
     if (paymentsTotalCents !== receiptTotalCents) {
-      throw new Error(
+      throw new ReceiptValidationError(
+        "payments",
         `Payments (${centsToAmount(paymentsTotalCents)}) do not equal receipt total (${receiptTotal})`,
       );
     }
 
     const unsigned: Omit<Receipt, "receiptDeviceSignature"> = {
       receiptType,
-      receiptCurrency: input.currency,
+      // The signing string uppercases the currency, so the stored receipt and
+      // the day counters must too, or "usd" and "USD" split one day's totals.
+      receiptCurrency: input.currency.toUpperCase(),
       receiptCounter: s.receiptCounter + 1,
       receiptGlobalNo: s.receiptGlobalNo + 1,
       invoiceNo: input.invoiceNo,
@@ -594,9 +620,12 @@ export class FiscalDevice {
         { receipt: prepared.receipt },
       );
     } catch (err) {
-      // A server answer means FDMS did not take the receipt; nothing is
-      // pending. A network failure keeps the marker for reconcile().
-      if (err instanceof FdmsApiError) await this.storage?.delete(KEY_PENDING);
+      // A definite refusal (4xx) means FDMS did not take the receipt;
+      // nothing is pending. A network failure, 5xx, 408 or 429 leaves the
+      // outcome unknown and keeps the marker for reconcile().
+      if (err instanceof FdmsApiError && !isOutcomeUnknown(err)) {
+        await this.storage?.delete(KEY_PENDING);
+      }
       throw err;
     }
 
@@ -672,6 +701,126 @@ export class FiscalDevice {
 
 // ---------------------------------------------------------------------------
 
+const RECEIPT_TYPES: readonly ReceiptType[] = ["FiscalInvoice", "CreditNote", "DebitNote"];
+
+/**
+ * Refuse inputs FDMS would reject or record wrongly, naming the field.
+ * Amounts are checked here too so every input error is a
+ * ReceiptValidationError. Payments adding up is checked in signReceipt,
+ * once the total is known.
+ */
+function validateReceiptInput(input: ReceiptInput, previousReceiptDate?: string): void {
+  const fail = (field: string, reason: string): never => {
+    throw new ReceiptValidationError(field, reason);
+  };
+  const amount = (v: number | Money, field: string): void => {
+    let c: number;
+    try {
+      c = amountToCents(v, field);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return fail(field, msg.startsWith(`${field}: `) ? msg.slice(field.length + 2) : msg);
+    }
+    if (!Number.isSafeInteger(c)) fail(field, `${String(v)} is too large to hold exactly in cents`);
+  };
+
+  if (input.receiptType !== undefined && !RECEIPT_TYPES.includes(input.receiptType)) {
+    fail("receiptType", `expected one of ${RECEIPT_TYPES.join(", ")}, got ${String(input.receiptType)}`);
+  }
+  if (typeof input.currency !== "string" || !/^[A-Za-z]{3}$/.test(input.currency)) {
+    fail("currency", `expected a three-letter ISO 4217 code, got ${JSON.stringify(input.currency)}`);
+  }
+  if (typeof input.invoiceNo !== "string" || input.invoiceNo.trim() === "") {
+    fail("invoiceNo", "must be a non-empty string");
+  }
+  if (input.invoiceNo.length > 50) {
+    fail("invoiceNo", `is ${input.invoiceNo.length} characters; FDMS allows at most 50`);
+  }
+  if (input.receiptType === "CreditNote" || input.receiptType === "DebitNote") {
+    validateCreditDebitNote(input.creditDebitNote, input.receiptType, fail);
+  }
+  if (!Array.isArray(input.lines) || input.lines.length === 0) {
+    fail("lines", "a receipt needs at least one line");
+  }
+  if (!Array.isArray(input.payments) || input.payments.length === 0) {
+    fail("payments", "a receipt needs at least one payment");
+  }
+
+  input.lines.forEach((l, i) => {
+    const at = `lines[${i}]`;
+    if (l === null || typeof l !== "object") fail(at, "must be an object");
+    if (typeof l.name !== "string" || l.name.trim() === "") fail(`${at}.name`, "must be a non-empty string");
+    amount(l.price, `${at}.price`);
+    if (typeof l.quantity !== "number" || !Number.isFinite(l.quantity) || l.quantity <= 0) {
+      fail(`${at}.quantity`, `must be a finite number greater than 0, got ${String(l.quantity)}`);
+    }
+    if (!Number.isInteger(l.taxId)) fail(`${at}.taxId`, `must be an integer, got ${String(l.taxId)}`);
+    if (
+      l.taxPercent !== undefined &&
+      l.taxPercent !== null &&
+      (typeof l.taxPercent !== "number" || !Number.isFinite(l.taxPercent) || l.taxPercent < 0)
+    ) {
+      fail(`${at}.taxPercent`, `must be a finite number of at least 0, or null for exempt, got ${String(l.taxPercent)}`);
+    }
+  });
+  input.payments.forEach((p, i) => {
+    if (p === null || typeof p !== "object") fail(`payments[${i}]`, "must be an object");
+    amount(p.amount, `payments[${i}].amount`);
+  });
+
+  // Only an explicit date is checked: generated dates are nudged forward in
+  // signReceipt. A date at or before the previous receipt's gets RCPT030
+  // (Red), after which the device can no longer close the day.
+  if (input.receiptDate !== undefined) {
+    if (!(input.receiptDate instanceof Date) || Number.isNaN(input.receiptDate.getTime())) {
+      fail("receiptDate", "must be a valid Date");
+    }
+    const date = fdmsDateTime(input.receiptDate);
+    if (previousReceiptDate && date <= previousReceiptDate) {
+      fail(
+        "receiptDate",
+        `${date} is not after the previous receipt's ${previousReceiptDate}; FDMS would answer RCPT030 and the day could no longer be closed by the device`,
+      );
+    }
+  }
+}
+
+/**
+ * A credit or debit note must say which receipt it corrects: either the
+ * FDMS receiptID, or the original's deviceID, receiptGlobalNo and
+ * fiscalDayNo together. Without one FDMS cannot link the note to a sale.
+ */
+function validateCreditDebitNote(
+  ref: ReceiptInput["creditDebitNote"],
+  receiptType: ReceiptType,
+  fail: (field: string, reason: string) => never,
+): void {
+  const field = "creditDebitNote";
+  if (ref === undefined || ref === null) {
+    fail(field, `is required for a ${receiptType}: reference the original receipt by receiptID, or by deviceID, receiptGlobalNo and fiscalDayNo`);
+  }
+  if (typeof ref !== "object" || Array.isArray(ref)) fail(field, "must be an object");
+  const given = (v: unknown): boolean => v !== undefined && v !== null;
+  const positiveInt = (key: keyof CreditDebitNote): void => {
+    const v = ref[key];
+    if (!Number.isSafeInteger(v) || (v as number) <= 0) {
+      fail(`${field}.${key}`, `must be a positive integer, got ${String(v)}`);
+    }
+  };
+  // Every part that is given is sent to FDMS, so check each one.
+  const byNumber = ["deviceID", "receiptGlobalNo", "fiscalDayNo"] as const;
+  for (const k of ["receiptID", ...byNumber] as const) {
+    if (given(ref[k])) positiveInt(k);
+  }
+  if (given(ref.receiptID)) return;
+  if (!byNumber.some((k) => given(ref[k]))) {
+    fail(field, "has no reference: give receiptID, or deviceID, receiptGlobalNo and fiscalDayNo");
+  }
+  for (const k of byNumber) {
+    if (!given(ref[k])) fail(`${field}.${k}`, "is required when receiptID is not given");
+  }
+}
+
 /** State is plain JSON; structuredClone is missing on Hermes. */
 function cloneState(state: FiscalDayState): FiscalDayState {
   return JSON.parse(JSON.stringify(state)) as FiscalDayState;
@@ -680,6 +829,8 @@ function cloneState(state: FiscalDayState): FiscalDayState {
 /**
  * Group lines by tax and compute the receipt tax summary. Arithmetic is in
  * integer cents; each line's tax is rounded on its own, as FDMS does.
+ * taxCode is part of the group, so two codes under one taxID stay separate
+ * entries, as in the spec's own example.
  */
 export function buildReceiptTaxes(
   lines: ReceiptLine[],
@@ -687,7 +838,7 @@ export function buildReceiptTaxes(
 ): ReceiptTax[] {
   const groups = new Map<string, { tax: ReceiptTax; taxCents: number; salesCents: number }>();
   for (const line of lines) {
-    const key = `${line.taxID}|${line.taxPercent ?? ""}`;
+    const key = `${line.taxID}|${line.taxPercent ?? ""}|${line.taxCode ?? ""}`;
     const g = groups.get(key) ?? {
       tax: {
         taxCode: line.taxCode ?? null,
@@ -700,10 +851,7 @@ export function buildReceiptTaxes(
       salesCents: 0,
     };
     const totalCents = toCents(line.receiptLineTotal);
-    const rate = (line.taxPercent ?? 0) / 100;
-    const taxCents = taxInclusive
-      ? Math.round(totalCents - totalCents / (1 + rate))
-      : Math.round(totalCents * rate);
+    const taxCents = lineTaxCents(totalCents, line.taxPercent ?? 0, taxInclusive);
     g.taxCents += taxCents;
     g.salesCents += taxInclusive ? totalCents : totalCents + taxCents;
     groups.set(key, g);
@@ -714,7 +862,71 @@ export function buildReceiptTaxes(
       taxAmount: centsToAmount(g.taxCents),
       salesAmountWithTax: centsToAmount(g.salesCents),
     }))
-    .sort((a, b) => a.taxID - b.taxID);
+    .sort(compareReceiptTaxes);
+}
+
+/**
+ * Tax on one line total, in integer cents, rounded half away from zero.
+ *
+ * The rate is taken in hundredths of a percent from the same two-decimal
+ * text that is signed (formatTaxPercent), so the tax always matches the
+ * signed percent. All arithmetic is on integers: a float multiply such as
+ * 100 * 0.145 gives 14.499999999999998 and rounds to 14 instead of 15.
+ *
+ *   exclusive: tax = total * bp / 10000
+ *   inclusive: tax = total * bp / (10000 + bp)
+ */
+function lineTaxCents(totalCents: number, taxPercent: number, taxInclusive: boolean): number {
+  const bp = Number(formatTaxPercent(taxPercent).replace(".", ""));
+  if (!Number.isSafeInteger(bp)) {
+    throw new RangeError(`taxPercent ${taxPercent} is not a finite percentage`);
+  }
+  const numerator = totalCents * bp;
+  if (!Number.isSafeInteger(numerator)) {
+    throw new RangeError(
+      `tax on a line total of ${totalCents} cents at ${taxPercent}% is too large to compute exactly`,
+    );
+  }
+  const denominator = taxInclusive ? 10000 + bp : 10000;
+  if (denominator <= 0) {
+    throw new RangeError(`taxPercent ${taxPercent} is not a valid tax-inclusive rate`);
+  }
+  return divideRoundHalfAwayFromZero(numerator, denominator);
+}
+
+/** n / d for integers with d > 0, rounded half away from zero, exactly. */
+function divideRoundHalfAwayFromZero(n: number, d: number): number {
+  const abs = Math.abs(n);
+  const rem = abs % d;
+  let q = (abs - rem) / d;
+  if (rem * 2 >= d) q += 1;
+  return n < 0 ? 0 - q : q; // 0 - q, not -q: never -0
+}
+
+/**
+ * Copy of the counters with each currency uppercased and counters that then
+ * share type, currency, taxID and moneyType summed into one.
+ */
+function mergeCurrencyCase(counters: FiscalDayCounter[]): FiscalDayCounter[] {
+  const merged: FiscalDayCounter[] = [];
+  for (const c of counters) {
+    const currency = c.fiscalCounterCurrency.toUpperCase();
+    const same = merged.find(
+      (m) =>
+        m.fiscalCounterType === c.fiscalCounterType &&
+        m.fiscalCounterCurrency === currency &&
+        (m.fiscalCounterTaxID ?? null) === (c.fiscalCounterTaxID ?? null) &&
+        (m.fiscalCounterMoneyType ?? null) === (c.fiscalCounterMoneyType ?? null),
+    );
+    if (same) {
+      same.fiscalCounterValue = centsToAmount(
+        toCents(same.fiscalCounterValue) + toCents(c.fiscalCounterValue),
+      );
+    } else {
+      merged.push({ ...c, fiscalCounterCurrency: currency });
+    }
+  }
+  return merged;
 }
 
 /** Fold a submitted receipt into the running fiscal-day counters. */
@@ -722,7 +934,7 @@ export function accumulateCounters(
   counters: FiscalDayCounter[],
   receipt: Receipt,
 ): void {
-  const currency = receipt.receiptCurrency;
+  const currency = receipt.receiptCurrency.toUpperCase();
   const sign = receipt.receiptType === "CreditNote" ? -1 : 1;
   const byTaxType =
     receipt.receiptType === "FiscalInvoice"
@@ -758,7 +970,7 @@ export function accumulateCounters(
     upsert(
       (c) =>
         c.fiscalCounterType === byTaxType &&
-        c.fiscalCounterCurrency === currency &&
+        c.fiscalCounterCurrency.toUpperCase() === currency &&
         c.fiscalCounterTaxID === t.taxID,
       () => ({
         fiscalCounterType: byTaxType,
@@ -772,7 +984,7 @@ export function accumulateCounters(
     upsert(
       (c) =>
         c.fiscalCounterType === taxByTaxType &&
-        c.fiscalCounterCurrency === currency &&
+        c.fiscalCounterCurrency.toUpperCase() === currency &&
         c.fiscalCounterTaxID === t.taxID,
       () => ({
         fiscalCounterType: taxByTaxType,
@@ -789,7 +1001,7 @@ export function accumulateCounters(
     upsert(
       (c) =>
         c.fiscalCounterType === "BalanceByMoneyType" &&
-        c.fiscalCounterCurrency === currency &&
+        c.fiscalCounterCurrency.toUpperCase() === currency &&
         c.fiscalCounterMoneyType === p.moneyTypeCode,
       () => ({
         fiscalCounterType: "BalanceByMoneyType",

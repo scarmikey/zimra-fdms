@@ -20,7 +20,7 @@ import { MemoryStorage } from "../src/core/storage.js";
 import { TransportError } from "../src/core/transport.js";
 import { FdmsApiError, type DeviceIdentity } from "../src/core/types.js";
 import { cents } from "../src/core/money.js";
-import { DayNotClosableError, type ReceiptInput } from "../src/core/device.js";
+import { DayNotClosableError, ReceiptValidationError, type ReceiptInput } from "../src/core/device.js";
 import { fdmsDateTime } from "../src/core/signing.js";
 
 const SALE: ReceiptInput = {
@@ -156,6 +156,13 @@ describe("simulator", () => {
       a.response.validationErrors.map((e) => `${e.validationErrorCode}:${e.validationErrorColor}`),
       ["RCPT031:Yellow"],
     );
+    // The SDK now refuses the backwards date itself...
+    await assert.rejects(
+      fd.submitReceipt({ ...SALE, invoiceNo: "INV-2", receiptDate: new Date() }),
+      (err: unknown) => err instanceof ReceiptValidationError && err.field === "receiptDate",
+    );
+    // ...so forget the previous date locally to check the simulator still flags it.
+    fd.restoreState({ ...fd.getState()!, previousReceiptDate: undefined });
     const b = await fd.submitReceipt({ ...SALE, invoiceNo: "INV-2", receiptDate: new Date() });
     assert.deepEqual(b.response.validationErrors.map((e) => e.validationErrorCode), ["RCPT030"]);
     assert.equal(fd.getState()!.redErrors?.length, 1);
@@ -308,9 +315,18 @@ describe("simulator", () => {
 
       sim.faults.dropAfterSubmit = 1;
       await assert.rejects(
-        fd.submitReceipt({ ...SALE, invoiceNo: "EARLIER-2", receiptDate: new Date() }),
+        fd.submitReceipt({ ...SALE, invoiceNo: "EARLIER-2", receiptDate: new Date(Date.now() + 3601_000) }),
         TransportError,
       );
+
+      // Model the FDMS latest-date status quirk independently of submission-time
+      // ordering validation: the server's stored first receipt is now latest-dated.
+      const storedDeviceForDate = sim.devices.get(identity.deviceId)!;
+      storedDeviceForDate.days[0]!.receipts[0]!.receipt.receiptDate =
+        "2099-12-31T23:59:59";
+
+      const statusBefore = await fd.getStatus();
+      assert.equal(statusBefore.lastReceiptGlobalNo, 1, "simulator must under-report receipt 2");
 
       const pendingBefore = await fd.pendingReceipt();
       assert.equal(pendingBefore?.receipt.receiptGlobalNo, 2);

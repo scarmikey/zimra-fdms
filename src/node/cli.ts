@@ -87,6 +87,17 @@ function money(n: number): string {
   return n.toFixed(2);
 }
 
+/**
+ * Reads a user-supplied text file as UTF-8, UTF-8 with a BOM, or UTF-16LE with
+ * a BOM. Windows PowerShell 5.1 writes the last one for `submit --sample > x`.
+ */
+function readTextFile(file: string): string {
+  const buf = readFileSync(file);
+  if (buf[0] === 0xff && buf[1] === 0xfe) return buf.subarray(2).toString("utf16le");
+  if (buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) return buf.subarray(3).toString("utf-8");
+  return buf.toString("utf-8");
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -456,7 +467,7 @@ Payments must sum to the receipt total.`);
 
   let input: ReceiptInput;
   try {
-    input = JSON.parse(readFileSync(file, "utf-8"));
+    input = JSON.parse(readTextFile(file));
   } catch (e) {
     fail(`${file} is not valid JSON: ${(e as Error).message}`);
   }

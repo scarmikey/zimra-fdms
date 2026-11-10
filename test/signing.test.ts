@@ -50,20 +50,67 @@ describe("date formatting", () => {
 });
 
 describe("concatenateReceiptTaxes", () => {
-  it("sorts by taxID and renders percent/cents", () => {
+  it("sorts by taxID then taxCode, includes taxCode in output", () => {
     const s = concatenateReceiptTaxes([
-      { taxID: 3, taxPercent: 15, taxAmount: 15, salesAmountWithTax: 115 },
-      { taxID: 1, taxPercent: null, taxAmount: 0, salesAmountWithTax: 10 },
+      { taxID: 3, taxCode: "C", taxPercent: 15, taxAmount: 15, salesAmountWithTax: 115 },
+      { taxID: 1, taxCode: "A", taxPercent: null, taxAmount: 0, salesAmountWithTax: 10 },
     ]);
-    // taxID 1 (exempt: no percent) then taxID 3
-    assert.equal(s, "01000" + "15.00150011500");
+    // taxID 1 (exempt: no percent, taxCode A) then taxID 3 (taxCode C)
+    assert.equal(s, "A01000" + "C15.00150011500");
   });
 
-  it("renders zero-rate as 0.00", () => {
+  it("renders zero-rate as 0.00 with taxCode", () => {
+    const s = concatenateReceiptTaxes([
+      { taxID: 513, taxCode: "B", taxPercent: 0, taxAmount: 0, salesAmountWithTax: 115 },
+    ]);
+    assert.equal(s, "B0.00011500");
+  });
+
+  it("omits taxCode when not provided", () => {
     const s = concatenateReceiptTaxes([
       { taxID: 513, taxPercent: 0, taxAmount: 0, salesAmountWithTax: 115 },
     ]);
     assert.equal(s, "0.00011500");
+  });
+
+  it("sorts same taxID by taxCode alphabetically", () => {
+    const s = concatenateReceiptTaxes([
+      { taxID: 3, taxCode: "D", taxPercent: 15, taxAmount: 300, salesAmountWithTax: 2300 },
+      { taxID: 3, taxCode: "C", taxPercent: 15, taxAmount: 150, salesAmountWithTax: 1150 },
+    ]);
+    // C before D for same taxID
+    assert.equal(s, "C15.0015000115000" + "D15.0030000230000");
+  });
+
+  it("matches ZIMRA spec example No 1", () => {
+    // From FDMS API spec v7.2, section 13.2.1, FiscalInvoice Example No 1
+    const s = concatenateReceiptTaxes([
+      { taxID: 1, taxCode: "A", taxPercent: null, taxAmount: 0, salesAmountWithTax: 2500 },
+      { taxID: 2, taxCode: "B", taxPercent: 0, taxAmount: 0, salesAmountWithTax: 3500 },
+      { taxID: 3, taxCode: "C", taxPercent: 15, taxAmount: 150, salesAmountWithTax: 1150 },
+      { taxID: 3, taxCode: "D", taxPercent: 15, taxAmount: 300, salesAmountWithTax: 2300 },
+    ]);
+    assert.equal(s, "A0250000B0.000350000C15.0015000115000D15.0030000230000");
+  });
+
+  it("orders taxCode by code point, not locale", () => {
+    // localeCompare puts "a" before "B" and "Ä" next to "A"; FDMS sorts bytes.
+    const s = concatenateReceiptTaxes([
+      { taxID: 1, taxCode: "a", taxPercent: 15, taxAmount: 1, salesAmountWithTax: 1 },
+      { taxID: 1, taxCode: "Ä", taxPercent: 15, taxAmount: 1, salesAmountWithTax: 1 },
+      { taxID: 1, taxCode: "B", taxPercent: 15, taxAmount: 1, salesAmountWithTax: 1 },
+      { taxID: 1, taxCode: null, taxPercent: 15, taxAmount: 1, salesAmountWithTax: 1 },
+    ]);
+    assert.equal(s, "15.00100100" + "B15.00100100" + "a15.00100100" + "Ä15.00100100");
+  });
+
+  it("orders astral taxCodes by code point, not UTF-16 unit", () => {
+    // "😀" is U+1F600 but its first UTF-16 unit (0xD83D) is below U+E000.
+    const s = concatenateReceiptTaxes([
+      { taxID: 1, taxCode: "😀", taxPercent: 15, taxAmount: 1, salesAmountWithTax: 1 },
+      { taxID: 1, taxCode: "\uE000", taxPercent: 15, taxAmount: 1, salesAmountWithTax: 1 },
+    ]);
+    assert.equal(s, "\uE00015.00100100" + "😀15.00100100");
   });
 });
 
@@ -150,6 +197,32 @@ describe("fiscalDaySigningString", () => {
   it("excludes zero-value counters", () => {
     const s = fiscalDaySigningString(37367, 3, "2026-07-29", counters);
     assert.ok(!s.includes("SALETAXBYTAX"));
+  });
+
+  it("orders currencies by code point, not locale", () => {
+    // Estonian collation puts Z before T and U, so localeCompare under an
+    // "et" default locale would sign ZWG ahead of USD. Stub that order so the
+    // test does not depend on the ICU data this Node build ships.
+    const two: FiscalDayCounter[] = ["ZWG", "usd"].map((cur) => ({
+      fiscalCounterType: "SaleByTax",
+      fiscalCounterCurrency: cur,
+      fiscalCounterTaxID: 1,
+      fiscalCounterTaxPercent: 15,
+      fiscalCounterValue: 1,
+    }));
+    const original = String.prototype.localeCompare;
+    const zFirst = (x: string) => x.toUpperCase().replace(/^Z/, "\u0000");
+    String.prototype.localeCompare = function (this: string, that: string) {
+      const a = zFirst(this), b = zFirst(that);
+      return a < b ? -1 : a > b ? 1 : 0;
+    };
+    let s: string;
+    try {
+      s = fiscalDaySigningString(1, 1, "2026-07-29", two);
+    } finally {
+      String.prototype.localeCompare = original;
+    }
+    assert.equal(s, "112026-07-29" + "SALEBYTAXUSD15.00100" + "SALEBYTAXZWG15.00100");
   });
 
   it("handles an empty day", () => {
@@ -273,6 +346,22 @@ describe("buildReceiptTaxes", () => {
     assert.equal(taxes[0]!.taxAmount, 15.5);
     assert.equal(taxes[0]!.salesAmountWithTax, 115.5);
   });
+
+  it("keeps two tax codes under one taxID as separate entries", () => {
+    // Spec v7.2 section 13.2.1, Example No 1: C and D are both taxID 3 at 15%.
+    const taxes = buildReceiptTaxes(
+      [
+        { ...line(1, 2300, 3, 15), taxCode: "D" },
+        { ...line(2, 1150, 3, 15), taxCode: "C" },
+        { ...line(3, 115, 3, 15), taxCode: "C" },
+      ],
+      true,
+    );
+    assert.deepEqual(
+      taxes.map((t) => [t.taxCode, t.salesAmountWithTax]),
+      [["C", 1265], ["D", 2300]],
+    );
+  });
 });
 
 describe("accumulateCounters", () => {
@@ -285,6 +374,18 @@ describe("accumulateCounters", () => {
     assert.equal(sale?.fiscalCounterValue, 230);
     assert.equal(bal?.fiscalCounterValue, 230);
     assert.equal(bal?.fiscalCounterMoneyType, "Cash");
+  });
+
+  it("keeps one counter set per currency whatever its case", () => {
+    const counters: FiscalDayCounter[] = [];
+    accumulateCounters(counters, receipt("FiscalInvoice", 115, "Cash"));
+    accumulateCounters(counters, { ...receipt("FiscalInvoice", 115, "Cash"), receiptCurrency: "usd" });
+    const sale = counters.filter((c) => c.fiscalCounterType === "SaleByTax");
+    const bal = counters.filter((c) => c.fiscalCounterType === "BalanceByMoneyType");
+    assert.equal(sale.length, 1);
+    assert.equal(bal.length, 1);
+    assert.equal(sale[0]!.fiscalCounterValue, 230);
+    assert.equal(bal[0]!.fiscalCounterValue, 230);
   });
 
   it("credit notes subtract", () => {

@@ -39,52 +39,6 @@
           }
         ],
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "Success",
             "headers": {
@@ -161,6 +115,26 @@
               }
             }
           },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
             "headers": {
@@ -177,6 +151,32 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -218,52 +218,6 @@
           }
         ],
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "Success",
             "headers": {
@@ -317,6 +271,26 @@
               }
             }
           },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
             "headers": {
@@ -333,6 +307,32 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -389,52 +389,6 @@
           "required": true
         },
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "Success",
             "headers": {
@@ -479,6 +433,26 @@
               }
             }
           },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
             "headers": {
@@ -515,6 +489,32 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -570,52 +570,6 @@
           }
         },
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "Success",
             "headers": {
@@ -659,6 +613,26 @@
               }
             }
           },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
             "headers": {
@@ -695,6 +669,32 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -751,52 +751,6 @@
           "required": true
         },
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "Success",
             "headers": {
@@ -841,6 +795,26 @@
               }
             }
           },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
             "headers": {
@@ -877,6 +851,32 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -932,52 +932,6 @@
           }
         },
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "Success",
             "headers": {
@@ -1028,6 +982,26 @@
               }
             }
           },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
             "headers": {
@@ -1050,63 +1024,6 @@
           },
           "429": {
             "description": "Too Many Requests",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/Device/v1/{deviceID}/Ping": {
-      "post": {
-        "tags": [
-          "Device"
-        ],
-        "description": "Endpoint is used to report device is online to Fiscalisation Backend. When device is turned on, it must regularly report to Fiscalisation Backend that it is online. Reporting periodicity is specified in reportingFrequency parameter received in response from Fiscalisation Backend.",
-        "parameters": [
-          {
-            "name": "deviceID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "DeviceModelName",
-            "in": "header",
-            "description": "Device model name as registered in Tax Authority",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "DeviceModelVersion",
-            "in": "header",
-            "description": "Device model version number as registered in Tax Authority",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "401": {
-            "description": "Device certificate expired.",
             "headers": {
               "operationId": {
                 "description": "unique operation id",
@@ -1150,7 +1067,44 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/Device/v1/{deviceID}/Ping": {
+      "post": {
+        "tags": [
+          "Device"
+        ],
+        "description": "Endpoint is used to report device is online to Fiscalisation Backend. When device is turned on, it must regularly report to Fiscalisation Backend that it is online. Reporting periodicity is specified in reportingFrequency parameter received in response from Fiscalisation Backend.",
+        "parameters": [
+          {
+            "name": "deviceID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           },
+          {
+            "name": "DeviceModelName",
+            "in": "header",
+            "description": "Device model name as registered in Tax Authority",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "DeviceModelVersion",
+            "in": "header",
+            "description": "Device model version number as registered in Tax Authority",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
           "200": {
             "description": "Success",
             "headers": {
@@ -1195,6 +1149,26 @@
               }
             }
           },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
             "headers": {
@@ -1211,6 +1185,32 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -1271,52 +1271,6 @@
           "required": true
         },
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "OK",
             "headers": {
@@ -1337,8 +1291,34 @@
               }
             }
           },
-          "422": {
-            "description": "Operation failed because fiscal day status must be FiscalDayClosed.",
+          "400": {
+            "description": "Operation failed because content is not provided.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/422",
+                  "title": "Bad request",
+                  "status": 400,
+                  "detail": "Content is empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Device certificate expired.",
             "headers": {
               "operationId": {
                 "description": "unique operation id",
@@ -1353,12 +1333,6 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/422",
-                  "title": "Unprocessable Entity",
-                  "status": 422,
-                  "detail": "Device fiscal day status must be FiscalDayClosed"
                 }
               }
             }
@@ -1389,8 +1363,8 @@
               }
             }
           },
-          "400": {
-            "description": "Operation failed because content is not provided.",
+          "422": {
+            "description": "Operation failed because fiscal day status must be FiscalDayClosed.",
             "headers": {
               "operationId": {
                 "description": "unique operation id",
@@ -1404,13 +1378,39 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                  "$ref": "#/components/schemas/ProblemDetails"
                 },
                 "example": {
                   "type": "https://httpstatuses.io/422",
-                  "title": "Bad request",
-                  "status": 400,
-                  "detail": "Content is empty"
+                  "title": "Unprocessable Entity",
+                  "status": 422,
+                  "detail": "Device fiscal day status must be FiscalDayClosed"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -1478,19 +1478,19 @@
           {
             "name": "Offset",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "integer",
-              "format": "int32"
+              "format": "int32",
+              "nullable": true
             }
           },
           {
             "name": "Limit",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "integer",
-              "format": "int32"
+              "format": "int32",
+              "nullable": true
             }
           },
           {
@@ -1531,52 +1531,6 @@
           }
         ],
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "OK",
             "headers": {
@@ -1617,6 +1571,26 @@
               }
             }
           },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Operation failed because of provided data or invalid object state in Fiscal backend. Returns problem details structure as described in https://www.rfc-editor.org/rfc/rfc7807 with errorCode field to specify error.",
             "headers": {
@@ -1633,6 +1607,32 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -1721,7 +1721,6 @@
           {
             "name": "Offset",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -1730,7 +1729,6 @@
           {
             "name": "Limit",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -1774,46 +1772,6 @@
           }
         ],
         "responses": {
-          "401": {
-            "description": "Unauthorized",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
           "200": {
             "description": "OK",
             "headers": {
@@ -1854,6 +1812,26 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Content",
             "headers": {
@@ -1870,6 +1848,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1945,7 +1943,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       },
       "BranchListResponse": {
         "type": "object",
@@ -2221,9 +2219,7 @@
       "DevicesGetSubmittedFileListRequest": {
         "required": [
           "fileUploadedFrom",
-          "fileUploadedTill",
-          "limit",
-          "offset"
+          "fileUploadedTill"
         ],
         "type": "object",
         "properties": {
@@ -2236,11 +2232,13 @@
           },
           "offset": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "limit": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "operator": {
             "allOf": [
@@ -2805,7 +2803,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       },
       "ReceiptDto": {
         "required": [
@@ -3388,7 +3386,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       },
       "VerifyBuyerByTinRequest": {
         "required": [

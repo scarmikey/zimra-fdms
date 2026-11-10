@@ -93,4 +93,17 @@ describe("CLI against the simulator", () => {
     assert.match(res.out, /more than two decimal places/);
     assert.equal(sim.log.length, before);
   });
+
+  it("reads a receipt that PowerShell saved with a byte-order mark", async () => {
+    // Windows PowerShell 5.1 redirects as UTF-16LE with a BOM, or UTF-8 with
+    // a BOM under Out-File -Encoding utf8. The bad price proves the JSON parsed.
+    const json = JSON.stringify({ currency: "USD", invoiceNo: "X", lines: [{ name: "a", price: 1.005, quantity: 1, taxId: 1, taxPercent: 15 }], payments: [{ moneyType: "Cash", amount: 1 }] });
+    writeFileSync(join(dir, "utf8bom.json"), "﻿" + json, "utf-8");
+    writeFileSync(join(dir, "utf16.json"), "﻿" + json, "utf16le");
+    for (const file of ["utf8bom.json", "utf16.json"]) {
+      const res = await cli("submit", file);
+      assert.equal(res.code, 1);
+      assert.match(res.out, /more than two decimal places/, `${file}: ${res.out}`);
+    }
+  });
 });

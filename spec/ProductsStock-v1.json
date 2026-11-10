@@ -59,7 +59,6 @@
           {
             "name": "Offset",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -68,7 +67,6 @@
           {
             "name": "Limit",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -112,52 +110,6 @@
           }
         ],
         "responses": {
-          "401": {
-            "description": "Device certificate expired.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server encountered temporary issues.",
-            "headers": {
-              "operationId": {
-                "description": "unique operation id",
-                "schema": {
-                  "type": "string",
-                  "description": "unique operation id",
-                  "format": ""
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                },
-                "example": {
-                  "type": "https://httpstatuses.io/500",
-                  "title": "Server error",
-                  "status": 500,
-                  "operationID": "0HMPDRRQL1C0G:00000005"
-                }
-              }
-            }
-          },
           "200": {
             "description": "OK",
             "headers": {
@@ -200,6 +152,26 @@
                   "title": "Bad request",
                   "status": 400,
                   "detail": "Content is empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Device certificate expired.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -252,6 +224,32 @@
                   "title": "Unprocessable Entity",
                   "status": 422,
                   "detail": "Device fiscal day status must be FiscalDayClosed"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server encountered temporary issues.",
+            "headers": {
+              "operationId": {
+                "description": "unique operation id",
+                "schema": {
+                  "type": "string",
+                  "description": "unique operation id",
+                  "format": ""
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                },
+                "example": {
+                  "type": "https://httpstatuses.io/500",
+                  "title": "Server error",
+                  "status": 500,
+                  "operationID": "0HMPDRRQL1C0G:00000005"
                 }
               }
             }
@@ -315,7 +313,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       },
       "ChangeGoodQuantityInStockRequest": {
         "required": [
@@ -444,7 +442,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       },
       "ProductsStockGetListDto": {
         "required": [
@@ -688,7 +686,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": { }
+        "additionalProperties": {}
       }
     }
   },

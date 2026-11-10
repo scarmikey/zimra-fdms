@@ -79,6 +79,12 @@ jobs:
         working-directory: packages/react-native
         run: |
           VERSION="$(node -p "require('./package.json').version")"
+          # A root-only release leaves this version unchanged, and npm refuses
+          # to publish the same version twice.
+          if npm view "zimra-fdms-react-native@$VERSION" version >/dev/null 2>&1; then
+            echo "zimra-fdms-react-native@$VERSION is already on npm, skipping"
+            exit 0
+          fi
           case "$VERSION" in
             *-*) TAG=beta ;;
             *) TAG=latest ;;

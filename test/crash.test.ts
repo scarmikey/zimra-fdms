@@ -38,7 +38,16 @@ function fakeFdms() {
   const accepted: number[] = [];
   let status = "FiscalDayClosed";
   let lastGlobal = 10;
-  const faults = { dropAfterSubmit: false, rejectSubmit: false };
+  // answerAfterAccept: FDMS records the receipt, then the caller sees this
+  // HTTP status (a proxy 502, a 500 after commit). answerBeforeAccept: the
+  // status comes back and nothing is recorded. Each fires once.
+  const faults = {
+    dropAfterSubmit: false,
+    rejectSubmit: false,
+    answerAfterAccept: 0,
+    answerBeforeAccept: 0,
+  };
+  const problem = (status: number) => ({ status, headers: {}, text: JSON.stringify({ title: "Bad Gateway", status }) });
   const transport: Transport = {
     request: async (req) => {
       const path = new URL(req.url).pathname.split("/").pop()!;
@@ -51,6 +60,11 @@ function fakeFdms() {
           status = "FiscalDayOpened";
           return reply({ fiscalDayNo: 3, operationID: "op" });
         case "SubmitReceipt": {
+          if (faults.answerBeforeAccept) {
+            const st = faults.answerBeforeAccept;
+            faults.answerBeforeAccept = 0;
+            return problem(st);
+          }
           if (faults.rejectSubmit) {
             return { status: 422, headers: {}, text: JSON.stringify({ errorCode: "FDC02", detail: "day not open" }) };
           }
@@ -75,6 +89,11 @@ function fakeFdms() {
           if (faults.dropAfterSubmit) {
             faults.dropAfterSubmit = false;
             throw new TransportError("connection reset");
+          }
+          if (faults.answerAfterAccept) {
+            const st = faults.answerAfterAccept;
+            faults.answerAfterAccept = 0;
+            return problem(st);
           }
           return reply({ receiptID: g, validationErrors: [], operationID: "op" });
         }
@@ -174,6 +193,138 @@ describe("pending-submit marker", () => {
     fdms.faults.rejectSubmit = false;
     const { receipt } = await fd.submitReceipt(SALE);
     assert.equal(receipt.receiptGlobalNo, 11);
+  });
+});
+
+describe("server answers that leave the outcome unknown", () => {
+  for (const status of [500, 502, 503, 504, 408, 429]) {
+    it(`keeps the marker on ${status} after FDMS accepted, and reconcile confirms`, async () => {
+      const storage = new MemoryStorage();
+      const fdms = fakeFdms();
+      const fd = await device(storage, fdms.transport);
+      await fd.openDay();
+      fdms.faults.answerAfterAccept = status;
+      await assert.rejects(fd.submitReceipt(SALE), (e: FdmsApiError) => e.status === status);
+      assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
+      // Without the marker the next sale would reuse 11 (RCPT012, Red).
+      await assert.rejects(fd.submitReceipt(SALE), PendingSubmitError);
+
+      assert.equal((await fd.reconcile()).action, "confirmed");
+      const { receipt } = await fd.submitReceipt({ ...SALE, invoiceNo: "next" });
+      assert.equal(receipt.receiptGlobalNo, 12);
+      assert.deepEqual(fdms.accepted, [11, 12]);
+    });
+  }
+
+  it("keeps the receipt unresolved when a 503 is followed by a lower status", async () => {
+    const storage = new MemoryStorage();
+    const fdms = fakeFdms();
+    const fd = await device(storage, fdms.transport);
+    await fd.openDay();
+    fdms.faults.answerBeforeAccept = 503;
+    await assert.rejects(fd.submitReceipt(SALE), (e: FdmsApiError) => e.status === 503);
+
+    const pending = await fd.pendingReceipt();
+    const result = await fd.reconcile();
+
+    assert.equal(result.action, "unknown");
+    assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, pending!.receipt.receiptGlobalNo);
+    assert.deepEqual(fdms.accepted, []);
+    assert.equal(fd.getState()!.receiptGlobalNo, 10);
+  });
+
+  it("does not resubmit while the outcome remains unknown", async () => {
+    const storage = new MemoryStorage();
+    const fdms = fakeFdms();
+    const fd = await device(storage, fdms.transport);
+    await fd.openDay();
+    fdms.faults.answerBeforeAccept = 503;
+    await assert.rejects(fd.submitReceipt(SALE), FdmsApiError);
+
+    fdms.faults.answerAfterAccept = 502;
+    assert.equal((await fd.reconcile()).action, "unknown");
+    assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
+    assert.deepEqual(fdms.accepted, []);
+
+    assert.equal((await fd.reconcile()).action, "unknown");
+    assert.deepEqual(fdms.accepted, []);
+  });
+
+  it("retains the marker rather than retrying an unresolved receipt", async () => {
+    const storage = new MemoryStorage();
+    const fdms = fakeFdms();
+    const fd = await device(storage, fdms.transport);
+    await fd.openDay();
+    fdms.faults.answerBeforeAccept = 503;
+    await assert.rejects(fd.submitReceipt(SALE), FdmsApiError);
+
+    fdms.faults.rejectSubmit = true;
+    const result = await fd.reconcile();
+
+    assert.equal(result.action, "unknown");
+    assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
+    assert.equal(fd.getState()!.receiptGlobalNo, 10);
+    assert.deepEqual(fdms.accepted, []);
+  });
+
+  it("keeps a receipt journalled when a 503 leaves its outcome unknown", async () => {
+    const storage = new MemoryStorage();
+    const fdms = fakeFdms();
+    const fd = await device(storage, fdms.transport);
+    await fd.openDay();
+    const q = new OfflineReceiptQueue(fd, new MemoryJournal());
+
+    fdms.faults.answerBeforeAccept = 503;
+    assert.equal(await q.submitOrEnqueue({ ...SALE, invoiceNo: "a" }), undefined);
+    assert.equal(q.size, 1);
+    assert.equal(fd.getState()!.receiptGlobalNo, 11);
+
+    const res = await q.flush();
+    assert.equal(res.remaining, 1);
+    assert.ok(res.error instanceof PendingSubmitError);
+    assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
+    assert.deepEqual(fdms.accepted, []);
+  });
+
+  for (const fault of ["answerAfterAccept", "dropAfterSubmit"] as const) {
+    it(`the queue confirms instead of resubmitting after ${fault} in submitOrEnqueue`, async () => {
+      const storage = new MemoryStorage();
+      const fdms = fakeFdms();
+      const fd = await device(storage, fdms.transport);
+      await fd.openDay();
+      const q = new OfflineReceiptQueue(fd, new MemoryJournal());
+      if (fault === "answerAfterAccept") fdms.faults.answerAfterAccept = 502;
+      else fdms.faults.dropAfterSubmit = true;
+      assert.equal(await q.submitOrEnqueue({ ...SALE, invoiceNo: "a" }), undefined);
+      assert.equal(q.size, 1);
+      assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
+
+      // The next sale drains the queue first: 11 is confirmed, not resent.
+      const b = await q.submitOrEnqueue({ ...SALE, invoiceNo: "b" });
+      assert.equal(b!.receipt.receiptGlobalNo, 12);
+      assert.equal(q.size, 0);
+      assert.deepEqual(fdms.accepted, [11, 12]);
+      assert.equal(await fd.pendingReceipt(), undefined);
+    });
+  }
+
+  it("a 502 during flush keeps the marker, and the next flush confirms without a duplicate", async () => {
+    const storage = new MemoryStorage();
+    const fdms = fakeFdms();
+    const fd = await device(storage, fdms.transport);
+    await fd.openDay();
+    const q = new OfflineReceiptQueue(fd, new MemoryJournal());
+    await q.enqueue({ ...SALE, invoiceNo: "a" });
+    await q.enqueue({ ...SALE, invoiceNo: "b" });
+    fdms.faults.answerAfterAccept = 502;
+    const first = await q.flush();
+    assert.equal(first.remaining, 2);
+    assert.ok(first.error instanceof FdmsApiError);
+    assert.equal((await fd.pendingReceipt())!.receipt.receiptGlobalNo, 11);
+
+    const second = await q.flush();
+    assert.equal(second.remaining, 0);
+    assert.deepEqual(fdms.accepted, [11, 12]);
   });
 });
 

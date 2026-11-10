@@ -3,7 +3,88 @@
 All changes verified live against ZIMRA's FDMS test environment on device 37367
 unless noted.
 
-## 0.4.0 — unreleased
+## Unreleased
+
+### Added
+
+- `signReceipt()` and `submitReceipt()` validate the `ReceiptInput` before
+  numbering or signing and throw the new `ReceiptValidationError` (with a
+  `field` path such as `lines[0].quantity`). Refused: empty `lines` or
+  `payments`; a zero, negative, `NaN` or non-numeric quantity; a negative
+  or `NaN` tax percent; a non-integer `taxId`; an empty line name; a
+  currency that is not three letters; an empty or over-50-character
+  `invoiceNo`; an unknown `receiptType`; an invalid `receiptDate`; and an
+  explicit `receiptDate` at or before the previous receipt's, which FDMS
+  answers with RCPT030 (Red) and which leaves the day unclosable by the
+  device. Fractional float amounts and payments that do not match the
+  total now throw `ReceiptValidationError` too (it extends `Error`, and
+  the payments message is unchanged). Not verified live: no FDMS call is
+  involved.
+- A `CreditNote` or `DebitNote` without a usable `creditDebitNote` is now
+  refused with `ReceiptValidationError` before numbering or signing. The
+  reference must give either a positive integer `receiptID`, or the
+  original's `deviceID`, `receiptGlobalNo` and `fiscalDayNo` together.
+  Fiscal invoices are unchanged. Not verified live: no FDMS call is
+  involved.
+
+### Fixed
+
+- A 5xx, 408 or 429 answer to SubmitReceipt no longer clears the
+  pending-submit marker. Before, any HTTP error was taken as a definite
+  rejection, so when a proxy answered 502 or 504, or FDMS answered 500
+  after recording the receipt, the next sale reused the same global
+  number and FDMS gave it RCPT012 (Red), leaving the day unclosable by the
+  device. The marker now stays and `submitReceipt()` refuses with
+  `PendingSubmitError` until `reconcile()` settles it. `reconcile()` keeps
+  the marker (and throws) when its resubmit gets one of those answers, and
+  `OfflineReceiptQueue.submitOrEnqueue()` journals the receipt instead of
+  throwing. `submitOrEnqueue()` also keeps the device's pending marker when
+  it journals a receipt (it used to drop it, network failures included),
+  so the next flush confirms the receipt through GetStatus instead of
+  resending one FDMS may already hold. New `isOutcomeUnknown(err)` helper says which errors these are.
+  Tested locally with a scripted FDMS that records the receipt and then
+  answers 502, not live.
+- Receipt tax is now computed with integer arithmetic only. The
+  tax-exclusive path multiplied cents by a float rate, so $1.00 at 14.5%
+  gave `14.499999999999998` and rounded to $0.14 instead of $0.15 (439 of
+  the totals from $0.01 to $3,000 were a cent low at 14.5%, 219 at 7.25%).
+  The tax-inclusive path had the same flaw on exact half-cent results at
+  some rates (17 cents at 36% inclusive gave 4 cents of tax, not 5); at
+  15%, 15.5%, 14.5% and 5% it matched exact rounding on every total checked.
+  Negative line totals now round half away from zero, so a negative
+  line's tax mirrors the positive one. A non-finite tax percent, or a line
+  too large to compute exactly, now throws a `RangeError` instead of
+  signing a wrong amount. New conformance vector for the 14.5% case.
+  Tested locally against exact rational rounding, not live.
+- The receipt currency is now stored uppercased, as it is signed. Before,
+  `currency: "usd"` signed as `USD` but kept `usd` in the submitted receipt
+  and in the fiscal-day counters, so a day with both `usd` and `USD`
+  receipts had two counter sets that both signed as `USD` at CloseDay.
+  A day stored by an earlier version that already holds both `usd` and
+  `USD` counters is merged into one uppercase set when CloseDay is signed
+  and sent. CloseDay counters now sort currencies
+  by code point instead of `localeCompare`, so the signing string no
+  longer depends on the runtime's locale (under Estonian collation ZWG
+  sorted before USD). Tested locally, not live.
+
+## 0.4.1 — 2026-09-29
+
+### Fixed
+
+- The receipt signing string now includes each tax's `taxCode`, as FDMS API
+  spec v7.2 section 13.2.1 requires. Without it, FDMS rejected any receipt
+  whose taxes carry a code with RCPT020. Taxes with the same `taxID` and
+  rate but different codes now stay separate. Thanks to @okandas (#3).
+  Checked against the spec's Example No 1, not yet live.
+- Receipt taxes with the same `taxID` now sort by Unicode code point.
+  Plain string comparison used UTF-16 units, which put U+1F600 before
+  U+E000. Tested locally, not live.
+- `zimra-fdms submit` reads a receipt file saved with a byte-order mark.
+  Windows PowerShell 5.1 writes one when you redirect `submit --sample` to a
+  file, and the next `submit` failed with a JSON error. Tested locally, not
+  live.
+
+## 0.4.0 — 2026-09-06
 
 The core now runs anywhere. This is the first step of the 1.0 plan: no
 fiscal behaviour changes, and 0.3.x code keeps working.

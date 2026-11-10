@@ -23,6 +23,7 @@ import {
   FdmsClient,
   TransportError,
   isNetworkError,
+  isOutcomeUnknown,
   type Transport,
   type TransportRequest,
 } from "../src/core/transport.js";
@@ -216,6 +217,17 @@ describe("FdmsClient", () => {
     assert.equal(isNetworkError(new TransportError("boom")), true);
     assert.equal(isNetworkError(new FdmsApiError(400, undefined)), false);
   });
+
+  it("treats network failures, 5xx, 408 and 429 as an unknown outcome", () => {
+    assert.equal(isOutcomeUnknown(new TransportError("boom")), true);
+    for (const s of [500, 502, 503, 504, 408, 429]) {
+      assert.equal(isOutcomeUnknown(new FdmsApiError(s, undefined)), true, String(s));
+    }
+    for (const s of [400, 401, 403, 404, 409, 422]) {
+      assert.equal(isOutcomeUnknown(new FdmsApiError(s, undefined)), false, String(s));
+    }
+    assert.equal(isOutcomeUnknown(new Error("bug")), false);
+  });
 });
 
 describe("FetchTransport", () => {
@@ -359,6 +371,53 @@ describe("FiscalDevice through injected Signer and Transport", () => {
       `receiptDate ${receipt.receiptDate} should be near now, not two hours back`,
     );
     assert.ok(Math.abs(fd.clock.offsetMs - 7_200_000) < 5_000);
+  });
+
+  it("stores the currency uppercased, as it is signed", async () => {
+    const { signer, publicKeyPem } = await generatePemSigner();
+    const fdms = fakeFdms(publicKeyPem);
+    const fd = new FiscalDevice(device, { signer, transport: fdms.transport });
+    await fd.openDay();
+    const input = {
+      invoiceNo: "1",
+      lines: [{ name: "a", price: 1, quantity: 1, taxId: 1 }],
+      payments: [{ moneyType: "Cash" as const, amount: 1 }],
+    };
+    const { receipt } = await fd.submitReceipt({ ...input, currency: "usd" });
+    await fd.submitReceipt({ ...input, currency: "USD", invoiceNo: "2" });
+    assert.equal(receipt.receiptCurrency, "USD");
+    const currencies = new Set(fd.getState()!.counters.map((c) => c.fiscalCounterCurrency));
+    assert.deepEqual([...currencies], ["USD"]);
+    await fd.closeDay();
+  });
+
+  it("merges case-variant counters from an older stored day at CloseDay", async () => {
+    const { signer, publicKeyPem } = await generatePemSigner();
+    const fdms = fakeFdms(publicKeyPem);
+    const fd = new FiscalDevice(device, { signer, transport: fdms.transport });
+    const sale = (cur: string, value: number) => ({
+      fiscalCounterType: "SaleByTax" as const,
+      fiscalCounterCurrency: cur,
+      fiscalCounterTaxID: 1,
+      fiscalCounterTaxPercent: 15,
+      fiscalCounterValue: value,
+    });
+    fd.restoreState({
+      fiscalDayNo: 9,
+      fiscalDayDate: "2026-07-29",
+      receiptCounter: 2,
+      receiptGlobalNo: 43,
+      previousReceiptHash: "H",
+      counters: [sale("usd", 1.15), sale("USD", 2.3)],
+    });
+    await fd.closeDay();
+    const body = fdms.calls.find((c) => c.path === "CloseDay")!.body as {
+      fiscalDayCounters: { fiscalCounterCurrency: string; fiscalCounterValue: number }[];
+    };
+    assert.deepEqual(
+      body.fiscalDayCounters.map((c) => [c.fiscalCounterCurrency, c.fiscalCounterValue]),
+      [["USD", 3.45]],
+    );
   });
 
   it("renews the certificate with the same key", async () => {

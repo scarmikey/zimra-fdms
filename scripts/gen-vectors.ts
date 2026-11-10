@@ -87,11 +87,13 @@ function receipt(
 
 const receipts = [
   {
+    // Receipt 24 on device 37367, pinned in test/vectors.test.ts. Its live
+    // canonical string has no tax code, so this line carries none.
     name: "USD, one 15% line, tax inclusive, first receipt of the day (no previous hash)",
     previousReceiptHash: null as string | null,
     receipt: receipt({
       currency: "USD", counter: 1, globalNo: 24, invoiceNo: "INV-0001", date: "2026-09-06T12:18:39", inclusive: true,
-      lines: [line(1, "Consulting", 115, 1, 1, 15, "A")],
+      lines: [line(1, "Consulting", 115, 1, 1, 15)],
       payments: [{ moneyTypeCode: "Cash", paymentAmount: 115 }],
     }),
   },
@@ -129,6 +131,20 @@ const receipts = [
       currency: "ZWG", counter: 1, globalNo: 28, invoiceNo: "INV-BIG", date: "2026-09-07T08:00:00", inclusive: true,
       lines: [line(1, "Equipment", 21474836.47, 1, 1, 15)],
       payments: [{ moneyTypeCode: "BankTransfer", paymentAmount: 21474836.47 }],
+    }),
+  },
+  {
+    name: "Spec v7.2 section 13.2.1 Example No 1: two tax codes under one taxID",
+    previousReceiptHash: null,
+    receipt: receipt({
+      currency: "USD", counter: 1, globalNo: 29, invoiceNo: "INV-SPEC1", date: "2026-09-08T08:00:00", inclusive: true,
+      lines: [
+        line(1, "Exempt", 2500, 1, 1, null, "A"),
+        line(2, "Zero-rated", 3500, 1, 2, 0, "B"),
+        line(3, "Standard C", 1150, 1, 3, 15, "C"),
+        line(4, "Standard D", 2300, 1, 3, 15, "D"),
+      ],
+      payments: [{ moneyTypeCode: "Cash", paymentAmount: 9450 }],
     }),
   },
 ];
@@ -222,10 +238,12 @@ const taxVectors = [
   { name: "Exclusive 15%: 100.00 -> tax 15.00, sales 115.00", lines: [line(1, "a", 100, 1, 1, 15)], taxInclusive: false },
   { name: "Per-line rounding: 0.30 and 0.20 inclusive at 15% give 0.04 + 0.03", lines: [line(1, "a", 0.1, 3, 1, 15), line(2, "b", 0.2, 1, 1, 15)], taxInclusive: true },
   { name: "Exempt and zero-rated grouped separately from 15%", lines: [line(1, "a", 10, 1, 3, null), line(2, "b", 10, 1, 2, 0), line(3, "c", 10, 1, 1, 15)], taxInclusive: true },
+  { name: "Exclusive 14.5%: 1.00 -> tax 0.15 (a float multiply gives 0.14)", lines: [line(1, "a", 1, 1, 1, 14.5)], taxInclusive: false },
 ].map((t) => ({ ...t, expected: buildReceiptTaxes(t.lines, t.taxInclusive) }));
 
 const out = {
-  version: 1,
+  // 2: taxCode joined the receipt tax block and its sort order.
+  version: 2,
   generatedAt: new Date().toISOString(),
   description:
     "Conformance vectors for the ZIMRA FDMS receipt and fiscal-day signing rules. Canonical strings and hashes must match byte for byte. Signatures are ECDSA P-256 over SHA-256, ASN.1 DER, and verify against publicKeyPem; a port verifies its own signatures rather than comparing bytes.",

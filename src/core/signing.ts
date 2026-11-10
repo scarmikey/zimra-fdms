@@ -39,14 +39,44 @@ export function fdmsDate(d: Date = new Date()): string {
 }
 
 /**
- * Tax block of the receipt signing string: taxes sorted by taxID, each as
- * [taxPercent 2dp, empty if exempt][taxAmount cents][salesAmountWithTax cents]
+ * Receipt tax order: taxID ascending, then taxCode alphabetical. taxCode
+ * compares by code point, not localeCompare, so the signing string does not
+ * depend on the runtime's locale. A missing taxCode sorts first.
+ */
+export function compareReceiptTaxes(a: ReceiptTax, b: ReceiptTax): number {
+  if (a.taxID !== b.taxID) return a.taxID - b.taxID;
+  return compareCodePoints(a.taxCode ?? "", b.taxCode ?? "");
+}
+
+/**
+ * String order by Unicode code point. Plain `<` compares UTF-16 units, which
+ * puts astral characters such as "😀" before U+E000..U+FFFF.
+ */
+function compareCodePoints(a: string, b: string): number {
+  const ia = a[Symbol.iterator]();
+  const ib = b[Symbol.iterator]();
+  for (;;) {
+    const x = ia.next();
+    const y = ib.next();
+    if (x.done || y.done) return x.done === y.done ? 0 : x.done ? -1 : 1;
+    const d = x.value.codePointAt(0)! - y.value.codePointAt(0)!;
+    if (d !== 0) return d;
+  }
+}
+
+/**
+ * Tax block of the receipt signing string: taxes in compareReceiptTaxes
+ * order, each as taxCode + taxPercent(2dp, empty if exempt) +
+ * taxAmount(cents) + salesAmountWithTax(cents).
+ *
+ * Reference: FDMS API spec v7.2, section 13.2.1.
  */
 export function concatenateReceiptTaxes(taxes: ReceiptTax[]): string {
   return [...taxes]
-    .sort((a, b) => a.taxID - b.taxID)
+    .sort(compareReceiptTaxes)
     .map(
       (t) =>
+        `${t.taxCode ?? ""}` +
         `${t.taxPercent !== undefined && t.taxPercent !== null ? formatTaxPercent(t.taxPercent) : ""}` +
         `${toCents(t.taxAmount)}` +
         `${toCents(t.salesAmountWithTax)}`,
@@ -103,7 +133,8 @@ const MONEY_TYPE_ORDER: Record<string, number> = {
  * deviceID + fiscalDayNo + fiscalDayDate(YYYY-MM-DD) + counters, where
  * counters are sorted by (type priority, currency, taxID/moneyType), zero
  * counters skipped, each as TYPE + CURRENCY + [taxPercent 2dp | moneyType] +
- * value(cents).
+ * value(cents). Currency compares uppercased and by code point, not
+ * localeCompare, so the order does not depend on the runtime's locale.
  */
 export function fiscalDaySigningString(
   deviceId: number,
@@ -116,7 +147,10 @@ export function fiscalDaySigningString(
     const pa = COUNTER_ORDER[a.fiscalCounterType] ?? 99;
     const pb = COUNTER_ORDER[b.fiscalCounterType] ?? 99;
     if (pa !== pb) return pa - pb;
-    const cur = a.fiscalCounterCurrency.localeCompare(b.fiscalCounterCurrency);
+    const cur = compareCodePoints(
+      a.fiscalCounterCurrency.toUpperCase(),
+      b.fiscalCounterCurrency.toUpperCase(),
+    );
     if (cur !== 0) return cur;
     const ta = a.fiscalCounterTaxID ?? -1;
     const tb = b.fiscalCounterTaxID ?? -1;
