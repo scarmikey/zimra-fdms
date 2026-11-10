@@ -3,6 +3,13 @@ name: Publish to npm
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing release tag to publish"
+        required: true
+        default: "v0.4.2"
+        type: string
 
 jobs:
   publish:
@@ -12,6 +19,8 @@ jobs:
       id-token: write # required for npm provenance
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -24,8 +33,10 @@ jobs:
       # Refuse to publish if the tag and package.json disagree — otherwise a
       # mistyped tag silently ships the wrong version number.
       - name: Verify tag matches package.json version
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${RELEASE_TAG#v}"
           PKG_VERSION="$(node -p "require('./package.json').version")"
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "::error::Tag $GITHUB_REF_NAME implies version $TAG_VERSION but package.json says $PKG_VERSION"
