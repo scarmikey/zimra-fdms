@@ -10,7 +10,7 @@ that can bite, in the order you are likely to meet them.
 lines: [{ name: "Bread", price: 2.5, quantity: 2, taxId: 1, taxPercent: 15 }]
 
 // 0.4.0
-import { cents } from "zimra-fdms";
+import { cents } from "@scarmikey/zimra-fdms";
 lines: [{ name: "Bread", price: cents("2.50"), quantity: 2, taxId: 1, taxPercent: 15 }]
 ```
 
@@ -28,7 +28,7 @@ CLI and MCP server already do.
 signCanonicalString(privateKeyPem, canonical, "der")
 
 // 0.4.0
-import { PemSigner } from "zimra-fdms";
+import { PemSigner } from "@scarmikey/zimra-fdms";
 signCanonicalString(new PemSigner(privateKeyPem), canonical, "der")
 ```
 
@@ -68,7 +68,7 @@ exportable key and returns `keys`. To register a key that already exists
 new OfflineReceiptQueue(device, myQueueStorage)
 
 // 0.4.0
-import { FileJournal } from "zimra-fdms";
+import { FileJournal } from "@scarmikey/zimra-fdms";
 new OfflineReceiptQueue(device, new FileJournal("./.zimra"))
 ```
 

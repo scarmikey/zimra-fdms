@@ -94,7 +94,7 @@ if(matchMedia('(pointer:fine)').matches && !reduced){
 
 /* terminal typing */
 (()=>{
-  const el=document.getElementById('typed'), cmd='npm install zimra-fdms';
+  const el=document.getElementById('typed'), cmd='npm install @scarmikey/zimra-fdms';
   let i=0;
   ScrollTrigger.create({trigger:'.term',start:'top 95%',once:true,onEnter:()=>{
     if(reduced){el.textContent=cmd;return;}
@@ -102,7 +102,7 @@ if(matchMedia('(pointer:fine)').matches && !reduced){
   }});
 })();
 } else {
-  document.getElementById('typed').textContent='npm install zimra-fdms';
+  document.getElementById('typed').textContent='npm install @scarmikey/zimra-fdms';
 }
 
 /* copy buttons */
@@ -115,7 +115,7 @@ function wireCopy(id,text){
     setTimeout(()=>{b.textContent='Copy';b.classList.remove('ok')},1700);
   });
 }
-wireCopy('copy','npm install zimra-fdms');
+wireCopy('copy','npm install @scarmikey/zimra-fdms');
 wireCopy('copycode',()=>document.querySelector('.codewin pre:not([hidden]) code').innerText);
 
 /* pos.ts / MCP tab toggle */

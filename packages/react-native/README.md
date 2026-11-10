@@ -1,4 +1,4 @@
-# zimra-fdms-react-native
+# @scarmikey/zimra-fdms-react-native
 
 Android adapter for [zimra-fdms](../../README.md). The device key is created
 inside Android Keystore (StrongBox where the phone has one) with
@@ -6,7 +6,7 @@ inside Android Keystore (StrongBox where the phone has one) with
 read by a rooted process. The same key signs receipts and authenticates the
 mutual-TLS connection to FDMS.
 
-Everything fiscal runs in `zimra-fdms/core` on Hermes: canonical strings,
+Everything fiscal runs in `@scarmikey/zimra-fdms/core` on Hermes: canonical strings,
 SHA-256, MD5 for the QR checksum, counters and the hash chain. The native
 module does three things: generate and hold the key, sign bytes, and run
 HTTPS with the key as the client identity.
@@ -14,7 +14,7 @@ HTTPS with the key as the client identity.
 ## Install
 
 ```sh
-npm install zimra-fdms zimra-fdms-react-native
+npm install @scarmikey/zimra-fdms @scarmikey/zimra-fdms-react-native
 ```
 
 Autolinking picks up the Android module. Expo managed projects need a
@@ -24,7 +24,7 @@ or later.
 ## Register once
 
 ```ts
-import { KeystoreSigner, registerDevice } from "zimra-fdms-react-native";
+import { KeystoreSigner, registerDevice } from "@scarmikey/zimra-fdms-react-native";
 
 const signer = await KeystoreSigner.ensure("zimra-device-12345");
 const { certificatePem } = await registerDevice(
@@ -39,7 +39,7 @@ const { certificatePem } = await registerDevice(
 ## Every day
 
 ```ts
-import { createFiscalDevice } from "zimra-fdms-react-native";
+import { createFiscalDevice } from "@scarmikey/zimra-fdms-react-native";
 
 const device = createFiscalDevice(
   { deviceId: 12345, serialNumber: "MYPOS001", modelName: "Android", modelVersion: "1" },

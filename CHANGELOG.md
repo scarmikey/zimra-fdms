@@ -3,7 +3,7 @@
 All changes verified live against ZIMRA's FDMS test environment on device 37367
 unless noted.
 
-## Unreleased
+## 0.4.2 — 2026-11-10
 
 ### Added
 

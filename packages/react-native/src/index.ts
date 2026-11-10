@@ -22,7 +22,7 @@ import {
   type Transport,
   type TransportRequest,
   type TransportResponse,
-} from "zimra-fdms/core";
+} from "@scarmikey/zimra-fdms/core";
 
 interface NativeZimraFdms {
   generateKey(alias: string, requireStrongBox: boolean): Promise<{ strongBox: boolean }>;
@@ -46,8 +46,8 @@ function native(): NativeZimraFdms {
   if (!mod) {
     throw new Error(
       Platform.OS === "android"
-        ? "ZimraFdms native module not linked; rebuild the app after installing zimra-fdms-react-native"
-        : `zimra-fdms-react-native supports Android only (got ${Platform.OS})`,
+        ? "ZimraFdms native module not linked; rebuild the app after installing @scarmikey/zimra-fdms-react-native"
+        : `@scarmikey/zimra-fdms-react-native supports Android only (got ${Platform.OS})`,
     );
   }
   return mod;
@@ -154,4 +154,4 @@ export function createFiscalDevice(
   );
 }
 
-export * from "zimra-fdms/core";
+export * from "@scarmikey/zimra-fdms/core";

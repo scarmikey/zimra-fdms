@@ -1,6 +1,6 @@
 {
-  "name": "zimra-fdms",
-  "version": "0.4.1",
+  "name": "@scarmikey/zimra-fdms",
+  "version": "0.4.2",
   "description": "TypeScript SDK for the ZIMRA Fiscalisation Data Management System (FDMS): a portable fiscal core with device registration, mTLS, receipt signing, fiscal days, offline queue and QR codes, plus Node, CLI and MCP adapters",
   "keywords": [
     "zimra",
@@ -19,18 +19,20 @@
   "author": "Shaun Chivandire",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/munashe-chivandire/zimra-fdms.git"
+    "url": "git+https://github.com/scarmikey/zimra-fdms.git"
   },
   "bugs": {
-    "url": "https://github.com/munashe-chivandire/zimra-fdms/issues"
+    "url": "https://github.com/scarmikey/zimra-fdms/issues"
   },
-  "homepage": "https://github.com/munashe-chivandire/zimra-fdms#readme",
+  "homepage": "https://github.com/scarmikey/zimra-fdms#readme",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "vectors"
+    "vectors",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

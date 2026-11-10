@@ -31,7 +31,7 @@ those parts once, correctly, in the open.
 ## Install
 
 ```sh
-npm install zimra-fdms
+npm install @scarmikey/zimra-fdms
 ```
 
 Node 18+. Three runtime dependencies: `@peculiar/x509` (certificate
@@ -43,8 +43,8 @@ Three entry points:
 | Import | What you get | Runs on |
 | --- | --- | --- |
 | `zimra-fdms` | The Node bundle: core plus `PemSigner`, `NodeTransport`, the CLI and MCP server. What 0.3.x code imports. | Node 18+ |
-| `zimra-fdms/core` | `FiscalDevice`, signing strings, counters, hash chain, QR, offline queue, `buildCsr`. You supply a `Signer` and a `Transport`. | Anything with ES2020 |
-| `zimra-fdms-react-native` | `KeystoreSigner` and `OkHttpTransport` over a Kotlin module, in [packages/react-native](packages/react-native). | Android 8+ |
+| `@scarmikey/zimra-fdms/core` | `FiscalDevice`, signing strings, counters, hash chain, QR, offline queue, `buildCsr`. You supply a `Signer` and a `Transport`. | Anything with ES2020 |
+| `@scarmikey/zimra-fdms-react-native` | `KeystoreSigner` and `OkHttpTransport` over a Kotlin module, in [packages/react-native](packages/react-native). | Android 8+ |
 
 ## CLI — fiscalise without writing code
 
@@ -100,7 +100,7 @@ Add a device on the FDMS portal (or via ZIMRA onboarding for production) to
 get a **device ID**, **serial number** and **activation key**, then:
 
 ```ts
-import { registerDevice } from "zimra-fdms";
+import { registerDevice } from "@scarmikey/zimra-fdms";
 
 const { keys, certificatePem } = await registerDevice(
   { deviceId: 12345, serialNumber: "MYPOS001", modelName: "Server", modelVersion: "v1" },
@@ -113,7 +113,7 @@ const { keys, certificatePem } = await registerDevice(
 ### 2. Daily fiscal cycle
 
 ```ts
-import { FiscalDevice } from "zimra-fdms";
+import { FiscalDevice } from "@scarmikey/zimra-fdms";
 
 const device = new FiscalDevice(
   { deviceId: 12345, serialNumber: "MYPOS001", modelName: "Server", modelVersion: "v1" },
@@ -152,7 +152,7 @@ fractional JS number throws, because 11.5 and 11.499999 are the same float
 and FDMS signs over the cents:
 
 ```ts
-import { cents } from "zimra-fdms";
+import { cents } from "@scarmikey/zimra-fdms";
 
 lines: [{ name: "Bread", price: cents("2.50"), quantity: 2, taxId: 1, taxPercent: 15 }],
 payments: [{ moneyType: "Cash", amount: 5 }],
@@ -182,7 +182,7 @@ it locally. If the reported global number is lower, the outcome remains
 unknown: the pending marker is retained and the SDK does not resubmit.
 
 ```ts
-import { FiscalDevice } from "zimra-fdms";
+import { FiscalDevice } from "@scarmikey/zimra-fdms";
 
 const device = new FiscalDevice(identity, pems, { environment: "test", stateDir: "./.zimra" });
 await device.reconcile();     // on every start, before the first receipt
@@ -196,7 +196,7 @@ on every command.
 ### 5. Offline sales (72-hour grace window)
 
 ```ts
-import { OfflineReceiptQueue, FileJournal } from "zimra-fdms";
+import { OfflineReceiptQueue, FileJournal } from "@scarmikey/zimra-fdms";
 
 const queue = new OfflineReceiptQueue(device, new FileJournal("./.zimra"));
 await queue.submitOrEnqueue(receiptInput); // journals on network failure, 5xx, 408 or 429
@@ -243,7 +243,7 @@ register without ever being exported. On Node the defaults are
 which is what the PEM constructor above builds for you.
 
 ```ts
-import { FiscalDevice } from "zimra-fdms/core";
+import { FiscalDevice } from "@scarmikey/zimra-fdms/core";
 
 const device = new FiscalDevice(identity, { signer: myHsmSigner, transport: myTransport });
 ```
@@ -255,7 +255,7 @@ Green receipts. `device.clock.offsetMs` tells you how far off the device is.
 ### 8. Android
 
 ```ts
-import { KeystoreSigner, registerDevice, createFiscalDevice } from "zimra-fdms-react-native";
+import { KeystoreSigner, registerDevice, createFiscalDevice } from "@scarmikey/zimra-fdms-react-native";
 
 const signer = await KeystoreSigner.ensure("zimra-device-12345");   // StrongBox when available
 const { certificatePem } = await registerDevice(identity, "ACTIVKEY", signer, { environment: "test" });
@@ -319,7 +319,7 @@ ZIMRA_BASE_URL=https://localhost:8443 ZIMRA_CA=zimra-simulator-ca.pem \
 Or in a test suite:
 
 ```ts
-import { FdmsSimulator } from "zimra-fdms/simulator";
+import { FdmsSimulator } from "@scarmikey/zimra-fdms/simulator";
 
 const sim = await FdmsSimulator.create();
 const { url, caPem } = await sim.start();

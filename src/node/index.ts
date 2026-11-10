@@ -1,7 +1,6 @@
 /**
  * zimra-fdms for Node: the core plus PEM keys, an mTLS transport and file
- * storage. `import ... from "zimra-fdms"` resolves here, so 0.3.x code keeps
- * working; `zimra-fdms/core` is the same engine without the Node pieces.
+ * storage. `import ... from "@scarmikey/zimra-fdms"` resolves here as the scoped package entry point; `@scarmikey/zimra-fdms/core` is the same engine without the Node pieces.
  */
 export * from "../core/index.js";
 export { FiscalDevice, type NodeFiscalDeviceOptions } from "./device.js";

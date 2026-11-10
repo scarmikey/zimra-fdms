@@ -1,7 +1,7 @@
 /**
- * zimra-fdms/core: the fiscal engine with no platform imports. Everything
+ * @scarmikey/zimra-fdms/core: the fiscal engine with no platform imports. Everything
  * here runs on Node, Bun, Deno, Hermes and browsers unchanged. Platforms
- * supply a Signer and a Transport; see zimra-fdms/node for the Node ones.
+ * supply a Signer and a Transport; see @scarmikey/zimra-fdms/node for the Node ones.
  */
 export {
   registerDevice,

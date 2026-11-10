@@ -1,5 +1,5 @@
 {
-  "name": "zimra-fdms-react-native",
+  "name": "@scarmikey/zimra-fdms-react-native",
   "version": "0.4.0-beta.1",
   "description": "Android adapter for zimra-fdms: device key in Android Keystore, mutual TLS through OkHttp, fiscal core on Hermes",
   "license": "MIT",
@@ -10,7 +10,8 @@
     "dist",
     "android/build.gradle",
     "android/src",
-    "README.md"
+    "README.md",
+    "vectors"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -18,7 +19,7 @@
   },
   "peerDependencies": {
     "react-native": ">=0.71",
-    "zimra-fdms": ">=0.4.0"
+    "@scarmikey/zimra-fdms": ">=0.4.0"
   },
   "devDependencies": {
     "react-native": "^0.76.0",
@@ -26,7 +27,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/munashe-chivandire/zimra-fdms.git",
+    "url": "git+https://github.com/scarmikey/zimra-fdms.git",
     "directory": "packages/react-native"
+  },
+  "overrides": {
+    "image-size": "npm:image-size-next@1.2.2"
   }
 }
