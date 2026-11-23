@@ -1,0 +1,134 @@
+name: Validate Release (No Publish)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional existing release tag
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - .github/workflows/**
+      - package.json
+      - pnpm-lock.yaml
+      - packages/react-native/**
+      - src/**
+      - test/**
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate SDK and React Native packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify optional release tag
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          case "$RELEASE_TAG" in
+            v*) TAG_VERSION="${RELEASE_TAG#v}" ;;
+            *)
+              echo "::error::Release tag must start with v"
+              exit 1
+              ;;
+          esac
+
+          git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}" >/dev/null
+
+          TAG_COMMIT="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          HEAD_COMMIT="$(git rev-parse HEAD)"
+
+          if [ "$TAG_COMMIT" != "$HEAD_COMMIT" ]; then
+            echo "::error::Checked-out commit does not match release tag"
+            exit 1
+          fi
+
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag and package versions do not match"
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.4.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install root dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Root SDK typecheck
+        run: pnpm run typecheck
+
+      - name: Root SDK tests
+        run: pnpm test
+
+      - name: Root SDK build
+        run: pnpm run build
+
+      - name: Install React Native dependencies
+        working-directory: packages/react-native
+        run: npm ci --legacy-peer-deps
+
+      - name: Verify React Native compatibility
+        working-directory: packages/react-native
+        run: |
+          node <<'NODE'
+          const root = require("../../package.json");
+          const rn = require("./package.json");
+
+          const range = rn.peerDependencies?.["@scarmikey/zimra-fdms"];
+          const match = typeof range === "string"
+            ? range.match(/^>=(\d+)\.(\d+)\.(\d+)$/)
+            : null;
+
+          const rootMatch = root.version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+
+          if (!match || !rootMatch) {
+            console.error("Unsupported version or peer dependency format");
+            process.exit(1);
+          }
+
+          const minimum = match.slice(1).map(Number);
+          const actual = rootMatch.slice(1).map(Number);
+
+          const compatible = actual[0] > minimum[0] ||
+            (actual[0] === minimum[0] && actual[1] > minimum[1]) ||
+            (actual[0] === minimum[0] && actual[1] === minimum[1] && actual[2] >= minimum[2]);
+
+          if (!compatible) {
+            console.error("React Native peer dependency is incompatible");
+            process.exit(1);
+          }
+
+          console.log(`${rn.version} accepts root SDK ${root.version}`);
+          NODE
+
+      - name: React Native typecheck
+        working-directory: packages/react-native
+        run: npm run typecheck
+
+      - name: React Native build
+        working-directory: packages/react-native
+        run: npm run build
+
+      - name: Validation complete
+        run: echo "All checks passed. Nothing was published."

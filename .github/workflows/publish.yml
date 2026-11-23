@@ -6,100 +6,221 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Existing release tag to publish"
+        description: "Existing release tag to publish (for example v0.4.3)"
         required: true
-        default: "v0.4.2"
         type: string
+      publish_react_native:
+        description: "Also publish the React Native package"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # required for npm provenance
+      id-token: write
+
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_tag || github.ref }}
 
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.4.2
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
           registry-url: https://registry.npmjs.org
 
-      - run: npm ci
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      # Refuse to publish if the tag and package.json disagree — otherwise a
-      # mistyped tag silently ships the wrong version number.
-      - name: Verify tag matches package.json version
+      - name: Verify release tag matches package version
         env:
           RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
-          TAG_VERSION="${RELEASE_TAG#v}"
-          PKG_VERSION="$(node -p "require('./package.json').version")"
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME implies version $TAG_VERSION but package.json says $PKG_VERSION"
+          case "$RELEASE_TAG" in
+            v*) TAG_VERSION="${RELEASE_TAG#v}" ;;
+            *)
+              echo "::error::Release tag must start with v"
+              exit 1
+              ;;
+          esac
+
+          git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}" >/dev/null || {
+            echo "::error::Release tag $RELEASE_TAG does not exist"
+            exit 1
+          }
+
+          TAG_COMMIT="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          HEAD_COMMIT="$(git rev-parse HEAD)"
+
+          if [ "$TAG_COMMIT" != "$HEAD_COMMIT" ]; then
+            echo "::error::Checked-out commit does not match release tag $RELEASE_TAG"
             exit 1
           fi
-          echo "Publishing v$PKG_VERSION"
+
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag $RELEASE_TAG implies version $TAG_VERSION but package.json says $PKG_VERSION"
+            exit 1
+          fi
+
+          echo "Validated @scarmikey/zimra-fdms@$PKG_VERSION from $RELEASE_TAG"
 
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Test
-        run: npm test
+        run: pnpm test
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
-      - name: Publish
-        # prepublishOnly re-runs test+build; harmless, and keeps local publishes safe too
-        run: npm publish --provenance --access public
+      - name: Publish root SDK
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+
+          ERROR_FILE="$(mktemp)"
+          if npm view "@scarmikey/zimra-fdms@$VERSION" version >/dev/null 2>"$ERROR_FILE"; then
+            echo "@scarmikey/zimra-fdms@$VERSION is already published; skipping"
+            rm -f "$ERROR_FILE"
+            exit 0
+          fi
+
+          if grep -q "E404" "$ERROR_FILE"; then
+            echo "@scarmikey/zimra-fdms@$VERSION was not found; proceeding with publish"
+            rm -f "$ERROR_FILE"
+          else
+            cat "$ERROR_FILE" >&2
+            rm -f "$ERROR_FILE"
+            echo "::error::Could not verify npm publication status. Refusing to publish."
+            exit 1
+          fi
+
+          npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-react-native:
-    # @scarmikey/zimra-fdms-react-native peer-depends on the root package, so it goes
-    # out after it. A prerelease version (0.4.0-beta.1) lands on the beta
-    # dist-tag; a plain version on latest.
+    if: ${{ inputs.publish_react_native == true }}
     needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.4.2
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
           registry-url: https://registry.npmjs.org
 
-      - run: npm ci
-      - run: npm run build
+      - name: Install root SDK dependencies
+        run: pnpm install --frozen-lockfile
 
-      - working-directory: packages/react-native
-        run: npm install --no-package-lock --legacy-peer-deps
+      - name: Build root SDK
+        run: pnpm run build
 
-      - working-directory: packages/react-native
+      - name: Install React Native dependencies
+        working-directory: packages/react-native
+        run: npm ci --legacy-peer-deps
+
+      - name: Typecheck React Native bindings
+        working-directory: packages/react-native
+        run: npm run typecheck
+
+      - name: Build React Native bindings
+        working-directory: packages/react-native
         run: npm run build
 
-      - name: Publish
+      - name: Verify React Native package compatibility
+        working-directory: packages/react-native
+        run: |
+          node <<'NODE'
+          const root = require("../../package.json");
+          const rn = require("./package.json");
+
+          const range = rn.peerDependencies?.["@scarmikey/zimra-fdms"];
+          const match = typeof range === "string"
+            ? range.match(/^>=(\d+)\.(\d+)\.(\d+)$/)
+            : null;
+
+          if (!match) {
+            console.error(`Unsupported root SDK peer range: ${range}`);
+            process.exit(1);
+          }
+
+          const rootMatch = root.version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+          if (!rootMatch) {
+            console.error(`Unsupported root SDK version: ${root.version}`);
+            process.exit(1);
+          }
+
+          const minimum = match.slice(1).map(Number);
+          const actual = rootMatch.slice(1).map(Number);
+
+          const compatible = actual[0] > minimum[0] ||
+            (actual[0] === minimum[0] && actual[1] > minimum[1]) ||
+            (actual[0] === minimum[0] && actual[1] === minimum[1] && actual[2] >= minimum[2]);
+
+          if (!compatible) {
+            console.error(
+              `${rn.name}@${rn.version} requires root SDK ${range}, but release is ${root.version}`
+            );
+            process.exit(1);
+          }
+
+          console.log(`${rn.name}@${rn.version} is compatible with root SDK ${root.version}`);
+          NODE
+
+      - name: Publish React Native package
         working-directory: packages/react-native
         run: |
           VERSION="$(node -p "require('./package.json').version")"
-          # A root-only release leaves this version unchanged, and npm refuses
-          # to publish the same version twice.
-          if npm view "@scarmikey/zimra-fdms-react-native@$VERSION" version >/dev/null 2>&1; then
-            echo "@scarmikey/zimra-fdms-react-native@$VERSION is already on npm, skipping"
+
+          ERROR_FILE="$(mktemp)"
+          if npm view "@scarmikey/zimra-fdms-react-native@$VERSION" version >/dev/null 2>"$ERROR_FILE"; then
+            echo "@scarmikey/zimra-fdms-react-native@$VERSION is already published; skipping"
+            rm -f "$ERROR_FILE"
             exit 0
           fi
+
+          if grep -q "E404" "$ERROR_FILE"; then
+            echo "@scarmikey/zimra-fdms-react-native@$VERSION was not found; proceeding with publish"
+            rm -f "$ERROR_FILE"
+          else
+            cat "$ERROR_FILE" >&2
+            rm -f "$ERROR_FILE"
+            echo "::error::Could not verify npm publication status. Refusing to publish."
+            exit 1
+          fi
+
           case "$VERSION" in
             *-*) TAG=beta ;;
             *) TAG=latest ;;
           esac
+
           echo "Publishing @scarmikey/zimra-fdms-react-native@$VERSION to $TAG"
           npm publish --provenance --access public --tag "$TAG"
         env:
